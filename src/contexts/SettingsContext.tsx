@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { Settings } from '../types'
-import { MODEL_PRICING, type ModelName } from '../constants/modelPricing'
+import { MODEL_PRICING } from '../constants/modelPricing'
 
 const defaultSettings: Settings = {
   apiKey: '',

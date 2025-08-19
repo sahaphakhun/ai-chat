@@ -1,8 +1,8 @@
-import React from 'react'
+import { type FC } from 'react'
 import { useChat } from '../contexts/ChatContext'
 
-export const SessionList: React.FC = () => {
-  const { index, conversations, currentId, setCurrentId, renameChat } = useChat()
+export const SessionList: FC = () => {
+  const { index, conversations, currentId, setCurrentId } = useChat()
 
   return (
     <div className="w-64 shrink-0 border-r dark:border-neutral-800 overflow-y-auto h-[calc(100vh-48px)]">

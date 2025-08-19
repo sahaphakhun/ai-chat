@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState, type FC } from 'react'
 import { MODEL_PRICING } from '../constants/modelPricing'
 import { useSettings } from '../contexts/SettingsContext'
 import { listModels } from '../utils/openai'
 import { useToast } from '../contexts/ToastContext'
 
-export const ModelSelect: React.FC = () => {
+export const ModelSelect: FC = () => {
   const { settings, setSettings } = useSettings()
   const { push } = useToast()
-  const [models, setModels] = useState<string[]>(MODEL_PRICING.map(m => m.name))
+  const [, setModels] = useState<string[]>(MODEL_PRICING.map(m => m.name))
   const groups = MODEL_PRICING.reduce<Record<string, string[]>>((acc, m) => {
     acc[m.group] = acc[m.group] || []
     acc[m.group].push(m.name)

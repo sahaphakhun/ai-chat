@@ -19,7 +19,7 @@ type ChatCtxType = {
   addMessage: (msg: Omit<Message, 'id'>) => void
   startAssistant: () => string // returns assistant message id
   appendAssistantDelta: (id: string, delta: string) => void
-  endAssistant: (id: string) => void
+  endAssistant: () => void
   newChat: () => void
   deleteChat: (id: string) => void
   deleteAll: () => void
@@ -122,12 +122,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentId) return ''
     const id = uuid()
     const conv = conversations[currentId]
-    const nextConv = {
+    const nextConv: Conversation = {
       ...conv,
       updatedAt: Date.now(),
       messages: [...conv.messages, { id, role: 'assistant', content: '' }],
     }
-    const next = { ...conversations, [currentId]: nextConv }
+    const next: Record<string, Conversation> = { ...conversations, [currentId]: nextConv }
     void save(next)
     return id
   }
@@ -145,10 +145,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setConversations(next) // update UI ทันที
   }
 
-  const endAssistant = (id: string) => {
+  const endAssistant = () => {
     if (!currentId) return
     const conv = conversations[currentId]
-    const next = {
+    const next: Record<string, Conversation> = {
       ...conversations,
       [currentId]: { ...conv, updatedAt: Date.now() },
     }

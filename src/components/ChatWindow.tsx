@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import { useRef, useState, type FC } from 'react'
 import { useChat } from '../contexts/ChatContext'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -7,7 +7,7 @@ import { streamChat } from '../utils/openai'
 import { useToast } from '../contexts/ToastContext'
 import { countTokensText } from '../utils/token'
 
-export const ChatWindow: React.FC = () => {
+export const ChatWindow: FC = () => {
   const { conversations, currentId, addMessage, startAssistant, appendAssistantDelta, endAssistant } = useChat()
   const { settings } = useSettings()
   const { push } = useToast()
@@ -31,8 +31,8 @@ export const ChatWindow: React.FC = () => {
       systemPrompt: settings.systemPrompt,
       messages,
       onChunk: (d) => appendAssistantDelta(assistId, d),
-      onDone: () => { endAssistant(assistId); setLoading(false) },
-      onError: (e) => { push({ type: 'error', msg: 'สตรีมล้มเหลว' }); endAssistant(assistId); setLoading(false) },
+      onDone: () => { endAssistant(); setLoading(false) },
+      onError: () => { push({ type: 'error', msg: 'สตรีมล้มเหลว' }); endAssistant(); setLoading(false) },
       abortSignal: controller.signal
     })
   }
