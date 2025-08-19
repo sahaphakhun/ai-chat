@@ -1,0 +1,13 @@
+# Ignore node modules and other unnecessary files
+node_modules
+.git
+.gitignore
+Dockerfile
+npm-debug.log
+.env
+
+# Build output
+build
+out
+coverage
+dist
