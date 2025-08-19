@@ -4,7 +4,11 @@ export async function listModels(apiKey: string) {
   const res = await fetch('https://api.openai.com/v1/models', {
     headers: { Authorization: `Bearer ${apiKey}` }
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    let errText = ''
+    try { errText = await res.text() } catch {}
+    throw new Error(`HTTP ${res.status}: ${errText}`)
+  }
   const json = await res.json()
   return (json?.data ?? []) as Array<{ id: string }>
 }
@@ -41,7 +45,11 @@ export async function streamChat(opts: StreamOptions) {
       body: JSON.stringify(body),
       signal: abortSignal
     })
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok || !res.body) {
+      let errText = ''
+      try { errText = await res.text() } catch {}
+      throw new Error(`HTTP ${res.status}: ${errText}`)
+    }
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()

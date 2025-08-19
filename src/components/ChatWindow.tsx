@@ -32,7 +32,12 @@ export const ChatWindow: React.FC = () => {
       messages,
       onChunk: (d) => appendAssistantDelta(assistId, d),
       onDone: () => { endAssistant(assistId); setLoading(false) },
-      onError: (e) => { push({ type: 'error', msg: 'สตรีมล้มเหลว' }); endAssistant(assistId); setLoading(false) },
+      onError: (e) => {
+        const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
+        push({ type: 'error', msg })
+        endAssistant(assistId)
+        setLoading(false)
+      },
       abortSignal: controller.signal
     })
   }
