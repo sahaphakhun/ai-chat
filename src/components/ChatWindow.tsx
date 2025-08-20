@@ -37,7 +37,7 @@ export const ChatWindow: React.FC = () => {
       logger.warn('chat', 'พยายามส่งข้อความขณะยังไม่มีห้อง')
       return
     }
-    logger.info('message', 'ผู้ใช้ส่งข้อความ', { length: text.length })
+    logger.info('message', 'ผู้ใช้ส่งข้อความ', { length: text.length, preview: text.slice(0, 80) })
     addMessage({ role: 'user', content: text, tokens: countTokensText(text) })
 
     setLoading(true)
@@ -52,6 +52,7 @@ export const ChatWindow: React.FC = () => {
 
     const apiKey = String((settings as any)?.apiKey ?? '').trim()
     const model = (settings as any)?.model || 'gpt-5'
+    logger.debug('chat', 'เริ่มสตรีมคำตอบ', { model, hasApiKey: !!apiKey, history: messages.length })
 
     try {
       await streamChat({

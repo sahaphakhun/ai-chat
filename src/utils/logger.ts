@@ -41,6 +41,15 @@ function _log(level: LogLevel, type: string, msg: string, meta?: Record<string, 
   if (logs.length > MAX_LOGS) logs = logs.slice(-MAX_LOGS)
   persist()
   emit()
+
+  // duplicate log to console for DevTools visibility
+  try {
+    const prefix = `[${new Date(entry.ts).toISOString()}] ${entry.level.toUpperCase()} ${entry.type}: ${entry.msg}`
+    if (level === 'error') console.error(prefix, entry.meta ?? '')
+    else if (level === 'warn') console.warn(prefix, entry.meta ?? '')
+    else if (level === 'info') console.info(prefix, entry.meta ?? '')
+    else console.debug(prefix, entry.meta ?? '')
+  } catch {}
 }
 
 export const logger = {

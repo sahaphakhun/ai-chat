@@ -1,10 +1,12 @@
 import type { Message } from '../types'
+import { logger } from './logger'
 
 export async function listModels(apiKey: string) {
   // ถ้ามี API Key ให้ยิงตรงไป OpenAI, ถ้าไม่มีให้ลองผ่านเซิร์ฟเวอร์
   const endpoint = apiKey ? 'https://api.openai.com/v1/models' : '/api/models'
   const headers: Record<string, string> = {}
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+  logger.debug('openai', 'listModels: request', { endpoint })
   const res = await fetch(endpoint, { headers })
   if (!res.ok) {
     let errText = ''
@@ -12,6 +14,7 @@ export async function listModels(apiKey: string) {
     throw new Error(`HTTP ${res.status}: ${errText}`)
   }
   const json = await res.json()
+  logger.debug('openai', 'listModels: response', { count: (json?.data ?? []).length })
   return (json?.data ?? []) as Array<{ id: string }>
 }
 
@@ -37,6 +40,12 @@ export async function streamChat(opts: StreamOptions) {
       ...messages.map(m => ({ role: m.role, content: m.content }))
     ]
   }
+  logger.info('openai', 'streamChat: request', { hasApiKey: !!apiKey, model, systemPromptLength: (systemPrompt || '').length, messagesCount: messages.length })
+  try {
+    const safeMessagesPreview = messages.map((m, idx) => ({ idx, role: m.role, len: m.content.length, preview: (m.content || '').slice(0, 200) }))
+    const systemPreview = (systemPrompt || '').slice(0, 200)
+    logger.debug('openai', 'streamChat: payload preview', { systemPreview, safeMessagesPreview })
+  } catch {}
 
   const decoder = new TextDecoder()
   let buffer = ''
@@ -54,6 +63,7 @@ export async function streamChat(opts: StreamOptions) {
         if (!trimmed.startsWith('data:')) continue
         const data = trimmed.replace(/^data:\s*/, '')
         if (data === '[DONE]') {
+          logger.info('openai', 'streamChat: done')
           onDone()
           return
         }
@@ -63,7 +73,10 @@ export async function streamChat(opts: StreamOptions) {
           const delta = json?.delta ?? json?.choices?.[0]?.delta?.content ?? ''
           const errMsg = json?.error as string | undefined
           if (errMsg) return onError(new Error(errMsg))
-          if (delta) onChunk(delta)
+          if (delta) {
+            logger.debug('openai', 'streamChat: chunk', { bytes: (delta as string).length, preview: (delta as string).slice(0, 200) })
+            onChunk(delta)
+          }
         } catch {
           // ignore keepalive
         }
@@ -74,6 +87,7 @@ export async function streamChat(opts: StreamOptions) {
 
   try {
     if (apiKey) {
+      logger.debug('openai', 'streamChat: fetch OpenAI direct')
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -90,6 +104,7 @@ export async function streamChat(opts: StreamOptions) {
       }
       await readSseStream(res.body)
     } else {
+      logger.debug('openai', 'streamChat: fetch via server proxy /api/chat/stream')
       const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,6 +119,7 @@ export async function streamChat(opts: StreamOptions) {
       await readSseStream(res.body)
     }
   } catch (err) {
+    logger.error('openai', 'streamChat: error', { error: String(err) })
     onError(err)
   }
 }
