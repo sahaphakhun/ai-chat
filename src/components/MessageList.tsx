@@ -30,9 +30,30 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
   // เลื่อนลงอัตโนมัติเฉพาะเมื่อผู้ใช้อยู่ที่ด้านล่าง
   useEffect(() => {
     if (shouldAutoScroll && !isUserScrolling) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      // ใช้ setTimeout เพื่อให้ DOM อัพเดทก่อน
+      setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
     }
   }, [messages, shouldAutoScroll, isUserScrolling])
+
+  // เลื่อนลงทันทีเมื่อมีข้อความใหม่และผู้ใช้อยู่ที่ด้านล่าง
+  useEffect(() => {
+    if (messages.length > 0 && shouldAutoScroll) {
+      const container = containerRef.current
+      if (container) {
+        // ตรวจสอบว่าอยู่ใกล้ด้านล่างหรือไม่
+        const { scrollTop, scrollHeight, clientHeight } = container
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+        
+        if (isNearBottom) {
+          setTimeout(() => {
+            container.scrollTop = container.scrollHeight
+          }, 50)
+        }
+      }
+    }
+  }, [messages.length, shouldAutoScroll])
 
   const getMessageCost = (message: Message) => {
     if (!message.tokens) return null
@@ -46,6 +67,10 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
     <div 
       ref={containerRef}
       className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin"
+      style={{ 
+        scrollBehavior: 'smooth',
+        overscrollBehavior: 'contain'
+      }}
     >
       {messages.map((m) => (
         <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -95,14 +120,17 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
       
       {/* ปุ่มกลับไปด้านล่าง */}
       {isUserScrolling && (
-        <div className="fixed bottom-20 right-6 z-10">
+        <div className="fixed bottom-24 right-6 z-10 animate-in slide-in-from-bottom-2 duration-300">
           <button
             onClick={() => {
-              bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+              const container = containerRef.current
+              if (container) {
+                container.scrollTop = container.scrollHeight
+              }
               setShouldAutoScroll(true)
               setIsUserScrolling(false)
             }}
-            className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-105"
+            className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-105 backdrop-blur-sm"
             title="กลับไปด้านล่าง"
           >
             <svg 

@@ -7,28 +7,45 @@
 }
 
 /* Custom Scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af transparent;
+}
+
 .scrollbar-thin::-webkit-scrollbar { 
-  height: 6px; 
-  width: 6px; 
+  height: 8px; 
+  width: 8px; 
 }
 .scrollbar-thin::-webkit-scrollbar-thumb { 
   background: #9ca3af; 
   border-radius: 9999px; 
   transition: background-color 0.2s;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover { 
   background: #6b7280; 
+  background-clip: content-box;
 }
 .scrollbar-thin::-webkit-scrollbar-track { 
   background: transparent; 
 }
+.scrollbar-thin::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 /* Dark mode scrollbar */
+.dark .scrollbar-thin {
+  scrollbar-color: #4b5563 transparent;
+}
+
 .dark .scrollbar-thin::-webkit-scrollbar-thumb { 
   background: #4b5563; 
+  background-clip: content-box;
 }
 .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover { 
   background: #6b7280; 
+  background-clip: content-box;
 }
 
 /* Smooth animations */
@@ -87,4 +104,28 @@ select:focus-visible {
   .safe-area-bottom {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
+}
+
+/* Scroll to bottom button animation */
+@keyframes slide-in-from-bottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: slide-in-from-bottom;
+}
+
+.duration-300 {
+  animation-duration: 300ms;
 }

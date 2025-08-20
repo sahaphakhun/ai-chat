@@ -15,37 +15,28 @@ export function countTokensMessage(m: Message): number {
 }
 
 export function countTokensConversation(messages: Message[]) {
-  let input = 0
-  let output = 0
-  let totalFromAPI = 0
-  let hasAPIData = false
+  // ตรวจสอบว่ามีข้อมูลจาก API หรือไม่
+  const assistantMessages = messages.filter(m => m.role === 'assistant')
+  const messagesWithUsage = assistantMessages.filter(m => m.usage)
+  const hasCompleteAPIData = messagesWithUsage.length === assistantMessages.length && assistantMessages.length > 0
   
-  for (const m of messages) {
-    if (m.role === 'assistant' && m.usage) {
-      // ใช้ข้อมูลจาก OpenAI API ถ้ามี
-      output += m.usage.completion_tokens
-      hasAPIData = true
-      totalFromAPI += m.usage.total_tokens
-    } else {
-      // fallback ไปใช้การคำนวณเอง
-      const t = countTokensMessage(m)
-      if (m.role === 'assistant') output += t
-      else input += t
-    }
-  }
-  
-  // ถ้ามีข้อมูลจาก API บางส่วน ให้คำนวณ input tokens จากข้อมูลที่มี
-  if (hasAPIData) {
-    // หา input tokens จากข้อความที่ไม่ใช่ assistant หรือจาก usage data
-    input = 0
+  if (hasCompleteAPIData) {
+    // ใช้ข้อมูลจาก OpenAI API
+    let input = 0
+    let output = 0
+    
     for (const m of messages) {
-      if (m.role !== 'assistant') {
-        input += countTokensMessage(m)
+      if (m.role === 'assistant' && m.usage) {
+        input += m.usage.prompt_tokens
+        output += m.usage.completion_tokens
       }
     }
+    
+    return { input, output, total: input + output }
+  } else {
+    // ไม่มีข้อมูลจาก API ให้ return 0 แทนการคำนวณที่เพี้ยน
+    return { input: 0, output: 0, total: 0 }
   }
-  
-  return { input, output, total: input + output }
 }
 
 // ฟังก์ชันใหม่สำหรับคำนวณจาก usage data อย่างเดียว

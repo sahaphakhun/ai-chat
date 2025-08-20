@@ -1,15 +1,14 @@
 import React, { useMemo } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
 import { useChat } from '../contexts/ChatContext'
-import { countTokensConversation, countTokensFromUsage } from '../utils/token'
-import { costUSD, formatUSD, calculateCostFromUsage } from '../utils/cost'
+import { countTokensFromUsage } from '../utils/token'
+import { formatUSD, calculateCostFromUsage } from '../utils/cost'
 
 export const TokenCostPanel: React.FC = () => {
   const { settings, setSettings } = useSettings()
   const { state } = useChat()
   const { conversations, currentId, index } = state
   const conv = currentId ? conversations[currentId] : undefined
-  const stats = useMemo(() => countTokensConversation(conv?.messages ?? []), [conv?.messages])
   const apiStats = useMemo(() => countTokensFromUsage(conv?.messages ?? []), [conv?.messages])
 
   // Calculate costs for current conversation using API data if available
@@ -36,17 +35,15 @@ export const TokenCostPanel: React.FC = () => {
         hasAPIData: true
       }
     } else {
-      // fallback ไปใช้การคำนวณแบบเดิม
-      const inCost = costUSD(stats.input, settings.inPricePerK)
-      const outCost = costUSD(stats.output, settings.outPricePerK)
+      // ไม่มีข้อมูลจาก API ให้แสดง 0 แทนการคำนวณที่เพี้ยน
       return {
-        inputCost: inCost,
-        outputCost: outCost,
-        totalCost: inCost + outCost,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: 0,
         hasAPIData: false
       }
     }
-  }, [conv?.messages, apiStats.hasCompleteAPIData, settings.model, settings.inPricePerK, settings.outPricePerK, stats])
+  }, [conv?.messages, apiStats.hasCompleteAPIData, settings.model])
 
   // Calculate total costs across all conversations
   const allStats = useMemo(() => {
@@ -71,10 +68,8 @@ export const TokenCostPanel: React.FC = () => {
           }
           conversationsWithAPIData++
         } else {
-          // fallback ไปใช้การคำนวณแบบเดิม
-          const convStats = countTokensConversation(conversation.messages)
-          totalInputCost += costUSD(convStats.input, settings.inPricePerK)
-          totalOutputCost += costUSD(convStats.output, settings.outPricePerK)
+          // ไม่มีข้อมูลจาก API ไม่นับค่าใช้จ่าย (แสดง 0)
+          // ไม่เพิ่มอะไรเข้าไปใน totalInputCost และ totalOutputCost
         }
         totalConversations++
       }
@@ -127,18 +122,32 @@ export const TokenCostPanel: React.FC = () => {
             <div>
               <div className="text-gray-600 dark:text-gray-400">Input Tokens</div>
               <div className="font-medium text-gray-900 dark:text-gray-100">
-                {apiStats.hasCompleteAPIData ? apiStats.input.toLocaleString() : stats.input.toLocaleString()} = {formatUSD(currentCosts.inputCost)}
-                {apiStats.hasCompleteAPIData && apiStats.cached > 0 && (
-                  <div className="text-xs text-green-600 dark:text-green-400">
-                    (รวม cached: {apiStats.cached.toLocaleString()})
-                  </div>
+                {apiStats.hasCompleteAPIData ? (
+                  <>
+                    {apiStats.input.toLocaleString()} = {formatUSD(currentCosts.inputCost)}
+                    {apiStats.cached > 0 && (
+                      <div className="text-xs text-green-600 dark:text-green-400">
+                        (รวม cached: {apiStats.cached.toLocaleString()})
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-gray-500 dark:text-gray-400">
+                    รอข้อมูลจาก API = {formatUSD(0)}
+                  </span>
                 )}
               </div>
             </div>
             <div>
               <div className="text-gray-600 dark:text-gray-400">Output Tokens</div>
               <div className="font-medium text-gray-900 dark:text-gray-100">
-                {apiStats.hasCompleteAPIData ? apiStats.output.toLocaleString() : stats.output.toLocaleString()} = {formatUSD(currentCosts.outputCost)}
+                {apiStats.hasCompleteAPIData ? (
+                  <>{apiStats.output.toLocaleString()} = {formatUSD(currentCosts.outputCost)}</>
+                ) : (
+                  <span className="text-gray-500 dark:text-gray-400">
+                    รอข้อมูลจาก API = {formatUSD(0)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -150,7 +159,7 @@ export const TokenCostPanel: React.FC = () => {
                   <span className="ml-1 text-xs text-green-600 dark:text-green-400">✓ API</span>
                 )}
                 {!currentCosts.hasAPIData && (
-                  <span className="ml-1 text-xs text-yellow-600 dark:text-yellow-400">~ ประมาณ</span>
+                  <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">รอข้อมูล API</span>
                 )}
               </span>
               <span className="font-bold text-blue-900 dark:text-blue-300">{formatUSD(currentCosts.totalCost)}</span>
@@ -214,7 +223,7 @@ export const TokenCostPanel: React.FC = () => {
                 ) : allStats.conversationsWithAPIData > 0 ? (
                   <span className="text-yellow-600 dark:text-yellow-400">~ บางส่วนจาก API</span>
                 ) : (
-                  <span className="text-orange-600 dark:text-orange-400">~ ประมาณการ</span>
+                  <span className="text-gray-500 dark:text-gray-400">รอข้อมูล API</span>
                 )}
               </div>
             </div>
