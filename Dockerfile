@@ -9,7 +9,11 @@ RUN npm run build
 
 FROM node:20-alpine
 WORKDIR /app
-RUN npm i -g serve
+ENV NODE_ENV=production
+COPY package.json ./
+COPY package-lock.json ./
+RUN npm ci --omit=dev || npm install --omit=dev
 COPY --from=builder /app/dist ./dist
+COPY server ./server
 EXPOSE 3000
-CMD ["sh", "-c", "serve -s dist -l ${PORT:-3000}"]
+CMD ["node", "server/index.js"]

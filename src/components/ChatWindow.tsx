@@ -18,18 +18,23 @@ export const ChatWindow: React.FC = () => {
   const messages = conv?.messages ?? []
 
   const onSend = async (text: string) => {
-    if (!settings.apiKey) return push({ type: 'error', msg: 'กรอก API Key ก่อน' })
     addMessage({ role: 'user', content: text, tokens: countTokensText(text) })
 
     setLoading(true)
     const assistId = startAssistant()
     const controller = new AbortController()
     abortRef.current = controller
+    // ส่งประวัติโดยรวม "รวมข้อความล่าสุดของผู้ใช้" ไปยังสตรีม เพื่อหลีกเลี่ยงปัญหา state ยังไม่อัปเดตทันที
+    const payloadMessages = [
+      ...messages,
+      { id: 'temp-user', role: 'user', content: text }
+    ]
+
     await streamChat({
       apiKey: settings.apiKey.trim(),
       model: settings.model,
       systemPrompt: settings.systemPrompt,
-      messages,
+      messages: payloadMessages,
       onChunk: (d) => appendAssistantDelta(assistId, d),
       onDone: () => { endAssistant(); setLoading(false) },
       onError: (e) => {

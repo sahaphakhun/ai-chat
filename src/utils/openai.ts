@@ -1,9 +1,11 @@
 import type { Message } from '../types'
 
 export async function listModels(apiKey: string) {
-  const res = await fetch('https://api.openai.com/v1/models', {
-    headers: { Authorization: `Bearer ${apiKey}` }
-  })
+  // ถ้ามี API Key ให้ยิงตรงไป OpenAI, ถ้าไม่มีให้ลองผ่านเซิร์ฟเวอร์
+  const endpoint = apiKey ? 'https://api.openai.com/v1/models' : '/api/models'
+  const headers: Record<string, string> = {}
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+  const res = await fetch(endpoint, { headers })
   if (!res.ok) {
     let errText = ''
     try { errText = await res.text() } catch {}
@@ -35,26 +37,12 @@ export async function streamChat(opts: StreamOptions) {
       ...messages.map(m => ({ role: m.role, content: m.content }))
     ]
   }
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(body),
-      signal: abortSignal
-    })
-    if (!res.ok || !res.body) {
-      let errText = ''
-      try { errText = await res.text() } catch {}
-      throw new Error(`HTTP ${res.status}: ${errText}`)
-    }
 
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
+  const decoder = new TextDecoder()
+  let buffer = ''
 
+  async function readSseStream(stream: ReadableStream<Uint8Array>) {
+    const reader = stream.getReader()
     while (true) {
       const { value, done } = await reader.read()
       if (done) break
@@ -71,12 +59,50 @@ export async function streamChat(opts: StreamOptions) {
         }
         try {
           const json = JSON.parse(data)
-          const delta = json?.choices?.[0]?.delta?.content ?? ''
+          // server proxy ส่ง { delta } ส่วน OpenAI ส่ง choices[].delta.content
+          const delta = json?.delta ?? json?.choices?.[0]?.delta?.content ?? ''
+          const errMsg = json?.error as string | undefined
+          if (errMsg) return onError(new Error(errMsg))
           if (delta) onChunk(delta)
-        } catch { /* ignore JSON parse in keepalive */ }
+        } catch {
+          // ignore keepalive
+        }
       }
     }
     onDone()
+  }
+
+  try {
+    if (apiKey) {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(body),
+        signal: abortSignal
+      })
+      if (!res.ok || !res.body) {
+        let errText = ''
+        try { errText = await res.text() } catch {}
+        throw new Error(`HTTP ${res.status}: ${errText}`)
+      }
+      await readSseStream(res.body)
+    } else {
+      const res = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: abortSignal
+      })
+      if (!res.ok || !res.body) {
+        let errText = ''
+        try { errText = await res.text() } catch {}
+        throw new Error(`HTTP ${res.status}: ${errText}`)
+      }
+      await readSseStream(res.body)
+    }
   } catch (err) {
     onError(err)
   }

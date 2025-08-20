@@ -109,9 +109,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentId) return
     const id = uuid()
     const conv = conversations[currentId]
+    const nextTitle = conv.messages.length === 0 && msg.role === 'user'
+      ? (msg.content.split('\n')[0].slice(0, 60) || 'สนทนาใหม่')
+      : conv.title
     const nextConv = {
       ...conv,
       updatedAt: Date.now(),
+      title: nextTitle,
       messages: [...conv.messages, { ...msg, id } satisfies Message],
     }
     const next = { ...conversations, [currentId]: nextConv }
