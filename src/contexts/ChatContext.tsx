@@ -19,7 +19,7 @@ type ChatCtxType = {
   addMessage: (msg: Omit<Message, 'id'>) => void
   startAssistant: () => string // returns assistant message id
   appendAssistantDelta: (id: string, delta: string) => void
-  endAssistant: (id: string) => void
+  endAssistant: () => void
   newChat: () => void
   deleteChat: (id: string) => void
   deleteAll: () => void
@@ -112,7 +112,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nextConv = {
       ...conv,
       updatedAt: Date.now(),
-      messages: [...conv.messages, { ...msg, id }],
+      messages: [...conv.messages, { ...msg, id } satisfies Message],
     }
     const next = { ...conversations, [currentId]: nextConv }
     void save(next)
@@ -125,7 +125,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nextConv = {
       ...conv,
       updatedAt: Date.now(),
-      messages: [...conv.messages, { id, role: 'assistant', content: '' }],
+      messages: [...conv.messages, { id, role: 'assistant', content: '' } satisfies Message],
     }
     const next = { ...conversations, [currentId]: nextConv }
     void save(next)
@@ -135,7 +135,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const appendAssistantDelta = (id: string, delta: string) => {
     if (!currentId) return
     const conv = conversations[currentId]
-    const nextMsgs = conv.messages.map((m) =>
+    const nextMsgs: Message[] = conv.messages.map((m) =>
       m.id === id ? { ...m, content: m.content + delta } : m
     )
     const next = {
@@ -145,7 +145,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setConversations(next) // update UI ทันที
   }
 
-  const endAssistant = (id: string) => {
+  const endAssistant = () => {
     if (!currentId) return
     const conv = conversations[currentId]
     const next = {

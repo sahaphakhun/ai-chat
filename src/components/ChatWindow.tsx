@@ -31,11 +31,11 @@ export const ChatWindow: React.FC = () => {
       systemPrompt: settings.systemPrompt,
       messages,
       onChunk: (d) => appendAssistantDelta(assistId, d),
-      onDone: () => { endAssistant(assistId); setLoading(false) },
+      onDone: () => { endAssistant(); setLoading(false) },
       onError: (e) => {
         const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
         push({ type: 'error', msg })
-        endAssistant(assistId)
+        endAssistant()
         setLoading(false)
       },
       abortSignal: controller.signal
