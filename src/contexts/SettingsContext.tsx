@@ -29,8 +29,9 @@ const KEY = 'chatui:settings'
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>(() => {
     const raw = localStorage.getItem(KEY)
-    // ถ้าไม่มีค่า ให้ลองเติม apiKey ว่าง เพื่อให้ฝั่ง client ไปใช้ proxy ได้
-    return raw ? JSON.parse(raw) as Settings : { ...defaultSettings, apiKey: DEFAULT_API_KEY || '' }
+    // ผสานค่าที่บันทึกไว้กับค่าเริ่มต้น ป้องกันกรณีฟิลด์ใหม่หายไป
+    const saved = raw ? (JSON.parse(raw) as Partial<Settings>) : {}
+    return { ...defaultSettings, ...saved, apiKey: (saved.apiKey ?? DEFAULT_API_KEY ?? '') as string }
   })
 
   useEffect(() => {

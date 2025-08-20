@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useChat } from '../contexts/ChatContext'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -11,11 +11,19 @@ import { logger } from '../utils/logger'
 import type { Message } from '../types'
 
 export const ChatWindow: React.FC = () => {
-  const { conversations, currentId, addMessage, startAssistant, appendAssistantDelta, endAssistant } = useChat()
+  const { conversations, currentId, addMessage, startAssistant, appendAssistantDelta, endAssistant, newChat } = useChat()
   const { settings } = useSettings()
   const { push } = useToast()
   const abortRef = useRef<AbortController | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // สร้างห้องใหม่อัตโนมัติ ถ้ายังไม่มี currentId (กันเคสโหลดค่าผิดปกติหรือ storage ว่าง)
+  useEffect(() => {
+    if (!currentId) {
+      newChat()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId])
 
   const conv = currentId ? conversations[currentId] : undefined
   const messages = conv?.messages ?? []
@@ -42,22 +50,33 @@ export const ChatWindow: React.FC = () => {
       { id: 'temp-user', role: 'user', content: text } as Message
     ]
 
-    await streamChat({
-      apiKey: settings.apiKey.trim(),
-      model: settings.model,
-      systemPrompt: settings.systemPrompt,
-      messages: payloadMessages,
-      onChunk: (d) => appendAssistantDelta(assistId, d),
-      onDone: () => { endAssistant(); setLoading(false); logger.info('assistant', 'สตรีมเสร็จสิ้น') },
-      onError: (e) => {
-        const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
-        push({ type: 'error', msg })
-        endAssistant()
-        setLoading(false)
-        logger.error('assistant', 'สตรีมผิดพลาด', { error: String(e) })
-      },
-      abortSignal: controller.signal
-    })
+    const apiKey = String((settings as any)?.apiKey ?? '').trim()
+    const model = (settings as any)?.model || 'gpt-5'
+
+    try {
+      await streamChat({
+        apiKey,
+        model,
+        systemPrompt: settings.systemPrompt,
+        messages: payloadMessages,
+        onChunk: (d) => appendAssistantDelta(assistId, d),
+        onDone: () => { endAssistant(); setLoading(false); logger.info('assistant', 'สตรีมเสร็จสิ้น') },
+        onError: (e) => {
+          const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
+          push({ type: 'error', msg })
+          endAssistant()
+          setLoading(false)
+          logger.error('assistant', 'สตรีมผิดพลาด', { error: String(e) })
+        },
+        abortSignal: controller.signal
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'การส่งคำขอล้มเหลว'
+      push({ type: 'error', msg })
+      endAssistant()
+      setLoading(false)
+      logger.error('assistant', 'ส่งคำขอเริ่มสตรีมล้มเหลว', { error: String(e) })
+    }
   }
 
   const stop = () => { abortRef.current?.abort(); setLoading(false); logger.warn('assistant', 'ผู้ใช้หยุดสตรีม') }
