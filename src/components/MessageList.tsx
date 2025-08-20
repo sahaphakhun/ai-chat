@@ -8,12 +8,39 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
   }, [messages])
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
-      {messages.map(m => (
-        <div key={m.id} className={`max-w-[85%] md:max-w-3xl ${m.role === 'user' ? 'ml-auto' : ''}`}>
-          <div className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-sm
-            ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-neutral-100 dark:bg-neutral-800 dark:text-neutral-100'}`}>
-            {m.content}
+    <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+      {messages.map((m) => (
+        <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div className={`max-w-[85%] md:max-w-2xl lg:max-w-3xl ${m.role === 'user' ? 'order-2' : 'order-1'}`}>
+            {/* Avatar */}
+            <div className={`flex items-start space-x-3 ${m.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                ${m.role === 'user' 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
+                  : 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+                }`}>
+                {m.role === 'user' ? '👤' : '🤖'}
+              </div>
+              
+              {/* Message Content */}
+              <div className={`flex-1 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
+                <div className={`inline-block whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm shadow-sm
+                  ${m.role === 'user' 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md' 
+                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-md'
+                  }`}>
+                  {m.content}
+                </div>
+                
+                {/* Message Info */}
+                <div className={`mt-1 text-xs text-gray-500 dark:text-gray-400 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
+                  {m.role === 'user' ? 'คุณ' : 'AI Assistant'}
+                  {m.tokens && (
+                    <span className="ml-2">• {m.tokens} tokens</span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ))}

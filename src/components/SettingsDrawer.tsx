@@ -9,71 +9,148 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
   const { settings, setSettings } = useSettings()
   const { push } = useToast()
   const [showKey, setShowKey] = useState(false)
-  
+  const [testing, setTesting] = useState(false)
+
+  const testApiKey = async () => {
+    const key = settings.apiKey.trim()
+    if (!key) return push({ type: 'error', msg: 'กรอก API Key ก่อน' })
+    
+    setTesting(true)
+    try {
+      await listModels(key)
+      push({ type: 'success', msg: '✅ คีย์ใช้งานได้' })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'คีย์ไม่ถูกต้อง'
+      push({ type: 'error', msg: `❌ ${msg}` })
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
-    <div className={`fixed inset-y-0 right-0 w-full sm:w-[520px] bg-white dark:bg-neutral-900 border-l dark:border-neutral-800 transform transition-transform ${open ? 'translate-x-0' : 'translate-x-full'}`}>
-      <div className="flex items-center justify-between p-3 border-b dark:border-neutral-800">
-        <div className="font-medium">ตั้งค่า</div>
-        <button onClick={onClose} className="px-2 py-1 rounded bg-neutral-200 dark:bg-neutral-700">ปิด</button>
-      </div>
+    <>
+      {/* Backdrop */}
+      {open && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Drawer */}
+      <div className={`fixed inset-y-0 right-0 w-full sm:w-[600px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl transform transition-all duration-300 ease-out z-50 ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+              <span className="text-lg">⚙️</span>
+            </div>
+            <h2 className="text-xl font-semibold">ตั้งค่าระบบ</h2>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
 
-      <div className="p-4 space-y-6">
-        <div className="space-y-1">
-          <label className="text-sm">OpenAI API Key</label>
-          <div className="flex items-center gap-2">
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={settings.apiKey}
-              onChange={e => setSettings(s => ({ ...s, apiKey: e.target.value }))}
-              placeholder="sk-..."
-              className="flex-1 border dark:border-neutral-700 rounded p-2 bg-white dark:bg-neutral-900"
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+          {/* API Key Section */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">🔑</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">OpenAI API Key</h3>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={settings.apiKey}
+                    onChange={e => setSettings(s => ({ ...s, apiKey: e.target.value }))}
+                    placeholder="sk-..."
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowKey(v => !v)}
+                  className="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  title={showKey ? 'ซ่อน API Key' : 'แสดง API Key'}
+                >
+                  {showKey ? '👁️‍🗨️' : '👁️'}
+                </button>
+                <button
+                  onClick={testApiKey}
+                  disabled={testing || !settings.apiKey.trim()}
+                  className="px-4 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white transition-colors disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {testing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>ทดสอบ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🧪</span>
+                      <span>ทดสอบ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <span className="text-amber-600 dark:text-amber-400">⚠️</span>
+                  <div className="text-sm text-amber-800 dark:text-amber-300">
+                    <div className="font-medium">ข้อมูลความปลอดภัย:</div>
+                    <div>API Key จะถูกเก็บไว้ในอุปกรณ์ของคุณเท่านั้น (localStorage) และไม่ถูกส่งไปยังเซิร์ฟเวอร์อื่น หลีกเลี่ยงการใช้บนอุปกรณ์สาธารณะ</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* System Prompt Section */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">💬</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">System Instruction</h3>
+            </div>
+            
+            <textarea
+              value={settings.systemPrompt}
+              onChange={e => setSettings(s => ({ ...s, systemPrompt: e.target.value }))}
+              placeholder="ข้อความ system ที่จะส่งให้ AI ทุกครั้ง เช่น บทบาท ลักษณะการตอบ หรือข้อจำกัดต่างๆ"
+              className="w-full h-32 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
-            <button
-              onClick={() => setShowKey(v => !v)}
-              className="px-2 py-1 rounded bg-neutral-200 dark:bg-neutral-700"
-            >
-              {showKey ? 'ซ่อน' : 'แสดง'}
-            </button>
-            <button
-              onClick={async () => {
-                const key = settings.apiKey.trim()
-                if (!key) return push({ type: 'error', msg: 'กรอก API Key ก่อน' })
-                try {
-                  await listModels(key)
-                  push({ type: 'success', msg: 'คีย์ใช้งานได้' })
-                } catch (e) {
-                  const msg = e instanceof Error ? e.message : 'คีย์ไม่ถูกต้อง'
-                  push({ type: 'error', msg })
-                }
-              }}
-              className="px-2 py-1 rounded bg-blue-600 text-white"
-            >
-              ทดสอบคีย์
-            </button>
+            
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              💡 ตัวอย่าง: "คุณเป็นผู้ช่วยที่เป็นมิตรและให้ข้อมูลที่ถูกต้อง ตอบเป็นภาษาไทยเสมอ"
+            </div>
           </div>
-          <div className="text-xs text-neutral-500">
-            เก็บไว้ในอุปกรณ์ของคุณ (localStorage). หลีกเลี่ยงการใช้บนอุปกรณ์สาธารณะ
+
+          {/* Model Section */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">🤖</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">โมเดล AI</h3>
+            </div>
+            <ModelSelect />
+          </div>
+
+          {/* Token Cost Panel */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">💰</span>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ข้อมูลการใช้งาน</h3>
+            </div>
+            <TokenCostPanel />
           </div>
         </div>
-
-        <div className="space-y-1">
-          <label className="text-sm">System Instruction</label>
-          <textarea
-            value={settings.systemPrompt}
-            onChange={e => setSettings(s => ({ ...s, systemPrompt: e.target.value }))}
-            placeholder="ข้อความ system ที่จะส่งทุกครั้ง"
-            className="w-full h-32 border dark:border-neutral-700 rounded p-2 bg-white dark:bg-neutral-900"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm">โมเดล</label>
-          <ModelSelect />
-        </div>
-
-        <TokenCostPanel />
       </div>
-    </div>
+    </>
   )
 }

@@ -5,6 +5,86 @@
 :root {
   color-scheme: light dark;
 }
-.scrollbar-thin::-webkit-scrollbar { height: 8px; width: 8px; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #9ca3af; border-radius: 9999px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+
+/* Custom Scrollbar */
+.scrollbar-thin::-webkit-scrollbar { 
+  height: 6px; 
+  width: 6px; 
+}
+.scrollbar-thin::-webkit-scrollbar-thumb { 
+  background: #9ca3af; 
+  border-radius: 9999px; 
+  transition: background-color 0.2s;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { 
+  background: #6b7280; 
+}
+.scrollbar-thin::-webkit-scrollbar-track { 
+  background: transparent; 
+}
+
+/* Dark mode scrollbar */
+.dark .scrollbar-thin::-webkit-scrollbar-thumb { 
+  background: #4b5563; 
+}
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover { 
+  background: #6b7280; 
+}
+
+/* Smooth animations */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Focus styles */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Loading animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass effect */
+.glass {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background-color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(209, 213, 219, 0.3);
+}
+
+.dark .glass {
+  background-color: rgba(17, 24, 39, 0.75);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+}
+
+/* Mobile safe area */
+@supports (padding: max(0px)) {
+  .safe-area-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}

@@ -9,33 +9,71 @@ import { useSettings } from './contexts/SettingsContext'
 export default function App() {
   const [open, setOpen] = useState(false)
   const [openSessions, setOpenSessions] = useState(false)
-  const { settings } = useSettings()
+  const { settings, setSettings } = useSettings()
   useTheme(settings.theme)
 
   return (
-    <div className="h-screen flex flex-col text-neutral-900 dark:text-neutral-100">
-      <Toolbar onOpenSettings={() => setOpen(true)} onOpenSessions={() => setOpenSessions(true)} />
-      <div className="flex flex-1">
-        <div className="hidden md:block">
-          <SessionList />
-        </div>
-        <ChatWindow />
-      </div>
-
-      {/* Mobile Sessions Drawer */}
-      {openSessions && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpenSessions(false)} />
-          <div className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-white dark:bg-neutral-900 border-r dark:border-neutral-800 shadow-xl transform transition-transform">
-            <div className="flex items-center justify-between p-2 border-b dark:border-neutral-800">
-              <div className="font-medium">ห้องสนทนา</div>
-              <button onClick={() => setOpenSessions(false)} className="px-2 py-1 rounded bg-neutral-200 dark:bg-neutral-700">ปิด</button>
+    <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Header */}
+      <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">AI</span>
             </div>
-            <SessionList className="w-full h-[calc(100vh-44px)] overflow-y-auto" onSelect={() => setOpenSessions(false)} />
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">AI Chat Tester</h1>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setSettings(s => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              {settings.theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            <button
+              onClick={() => setOpen(true)}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              ⚙️
+            </button>
           </div>
         </div>
-      )}
+      </header>
 
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block w-80 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-r border-gray-200 dark:border-gray-700">
+          <SessionList />
+        </div>
+
+        {/* Mobile Sidebar Overlay */}
+        {openSessions && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpenSessions(false)} />
+            <div className="absolute inset-y-0 left-0 w-80 max-w-[85%] bg-white dark:bg-gray-900 shadow-2xl transform transition-transform">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">ห้องสนทนา</h2>
+                <button 
+                  onClick={() => setOpenSessions(false)} 
+                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <SessionList onSelect={() => setOpenSessions(false)} />
+            </div>
+          </div>
+        )}
+
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col">
+          <Toolbar onOpenSessions={() => setOpenSessions(true)} />
+          <ChatWindow />
+        </div>
+      </div>
+
+      {/* Settings Drawer */}
       <SettingsDrawer open={open} onClose={() => setOpen(false)} />
     </div>
   )
