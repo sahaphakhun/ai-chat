@@ -1,8 +1,12 @@
 import React from 'react'
 import { useChat } from '../contexts/ChatContext'
+import { useSettings } from '../contexts/SettingsContext'
+import { countTokensConversation } from '../utils/token'
+import { costUSD, formatUSD } from '../utils/cost'
 
 export const SessionList: React.FC<{ className?: string; onSelect?: () => void }> = ({ className, onSelect }) => {
   const { index, conversations, currentId, setCurrentId } = useChat()
+  const { settings } = useSettings()
 
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp)
@@ -27,6 +31,14 @@ export const SessionList: React.FC<{ className?: string; onSelect?: () => void }
     
     const content = lastMessage.content.trim()
     return content.length > 50 ? content.substring(0, 50) + '...' : content
+  }
+
+  const getConversationCost = (conversation: any) => {
+    if (!conversation?.messages?.length) return 0
+    const stats = countTokensConversation(conversation.messages)
+    const inCost = costUSD(stats.input, settings.inPricePerK)
+    const outCost = costUSD(stats.output, settings.outPricePerK)
+    return inCost + outCost
   }
 
   return (
@@ -56,6 +68,7 @@ export const SessionList: React.FC<{ className?: string; onSelect?: () => void }
               const c = conversations[id]
               const isActive = currentId === id
               const messageCount = c?.messages?.length || 0
+              const conversationCost = getConversationCost(c)
               
               return (
                 <li key={id}>
@@ -88,12 +101,23 @@ export const SessionList: React.FC<{ className?: string; onSelect?: () => void }
                           {formatDate(c?.updatedAt || Date.now())}
                         </div>
                         {messageCount > 0 && (
-                          <div className={`text-xs mt-1 px-2 py-0.5 rounded-full ${
-                            isActive 
-                              ? 'bg-white/20 text-white' 
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                          }`}>
-                            {messageCount} ข้อความ
+                          <div className="flex flex-col items-end space-y-1 mt-1">
+                            <div className={`text-xs px-2 py-0.5 rounded-full ${
+                              isActive 
+                                ? 'bg-white/20 text-white' 
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                            }`}>
+                              {messageCount} ข้อความ
+                            </div>
+                            {conversationCost > 0 && (
+                              <div className={`text-xs px-2 py-0.5 rounded-full ${
+                                isActive 
+                                  ? 'bg-green-500/20 text-green-100' 
+                                  : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                              }`}>
+                                {formatUSD(conversationCost)}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

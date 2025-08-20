@@ -1,11 +1,23 @@
 import React, { useEffect, useRef } from 'react'
+import { useSettings } from '../contexts/SettingsContext'
+import { costUSD, formatUSD } from '../utils/cost'
 import type { Message } from '../types'
 
 export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => {
+  const { settings } = useSettings()
   const bottomRef = useRef<HTMLDivElement>(null)
+  
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const getMessageCost = (message: Message) => {
+    if (!message.tokens) return null
+    const cost = message.role === 'user' 
+      ? costUSD(message.tokens, settings.inPricePerK)
+      : costUSD(message.tokens, settings.outPricePerK)
+    return cost
+  }
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
@@ -34,10 +46,19 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
                 
                 {/* Message Info */}
                 <div className={`mt-1 text-xs text-gray-500 dark:text-gray-400 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
-                  {m.role === 'user' ? 'คุณ' : 'AI Assistant'}
-                  {m.tokens && (
-                    <span className="ml-2">• {m.tokens} tokens</span>
-                  )}
+                  <div className="flex items-center justify-between">
+                    <span>{m.role === 'user' ? 'คุณ' : 'AI Assistant'}</span>
+                    {m.tokens && (
+                      <div className="flex items-center space-x-2">
+                        <span>• {m.tokens} tokens</span>
+                        {getMessageCost(m) && (
+                          <span className="text-green-600 dark:text-green-400 font-medium">
+                            • {formatUSD(getMessageCost(m)!)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

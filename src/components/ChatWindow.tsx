@@ -5,7 +5,8 @@ import { MessageInput } from './MessageInput'
 import { useSettings } from '../contexts/SettingsContext'
 import { streamChat } from '../utils/openai'
 import { useToast } from '../contexts/ToastContext'
-import { countTokensText } from '../utils/token'
+import { countTokensText, countTokensConversation } from '../utils/token'
+import { costUSD, formatUSD } from '../utils/cost'
 import type { Message } from '../types'
 
 export const ChatWindow: React.FC = () => {
@@ -17,6 +18,9 @@ export const ChatWindow: React.FC = () => {
 
   const conv = currentId ? conversations[currentId] : undefined
   const messages = conv?.messages ?? []
+  const stats = countTokensConversation(messages)
+  const inCost = costUSD(stats.input, settings.inPricePerK)
+  const outCost = costUSD(stats.output, settings.outPricePerK)
 
   const onSend = async (text: string) => {
     if (!currentId) {
@@ -91,25 +95,43 @@ export const ChatWindow: React.FC = () => {
       <MessageList messages={messages} />
       
       {/* Status Bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-            <span>โมเดล: {settings.model}</span>
+      <div className="px-4 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              <span>โมเดล: {settings.model}</span>
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              ข้อความ: {messages.length}
+            </div>
           </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            ข้อความ: {messages.length}
-          </div>
+          
+          {loading && (
+            <button 
+              onClick={stop} 
+              className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors shadow-sm"
+            >
+              <span>⏹️</span>
+              <span>หยุด</span>
+            </button>
+          )}
         </div>
         
-        {loading && (
-          <button 
-            onClick={stop} 
-            className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors shadow-sm"
-          >
-            <span>⏹️</span>
-            <span>หยุด</span>
-          </button>
+        {/* Cost Information */}
+        {messages.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
+                <span>💰 Total: {(stats.input + stats.output).toLocaleString()}</span>
+                <span>📊 Input: {stats.input.toLocaleString()}</span>
+                <span>📤 Output: {stats.output.toLocaleString()}</span>
+              </div>
+              <div className="font-medium text-gray-700 dark:text-gray-300">
+                ค่าใช้จ่าย: <span className="text-green-600 dark:text-green-400">{formatUSD(inCost + outCost)}</span>
+              </div>
+            </div>
+          </div>
         )}
       </div>
       
