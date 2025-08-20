@@ -51,12 +51,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     ;(async () => {
       const { index: idx, conversations: convs } = await loadAll()
-      let index0 = idx
+      let index0: IndexRecord = idx ?? { useDB: false, settings: settings as any, sessionIds: [] }
       let conversations0 = convs
       // บูตสแตรป: หากไม่มี index หรือไม่มี sessionIds หรือไม่มีข้อมูลห้อง ให้สร้างห้องใหม่
-      if (!index0 || (index0.sessionIds?.length ?? 0) === 0 || Object.keys(conversations0 || {}).length === 0) {
+      if ((index0.sessionIds?.length ?? 0) === 0 || Object.keys(conversations0 || {}).length === 0) {
         const conv = newConversation()
-        index0 = { useDB: index0?.useDB ?? false, settings: (index0?.settings as any) ?? (settings as any), sessionIds: [conv.id] }
+        index0 = { useDB: index0.useDB ?? false, settings: (index0.settings as any) ?? (settings as any), sessionIds: [conv.id] }
         conversations0 = { [conv.id]: conv }
       }
       // ทำความสะอาด sessionIds ที่ไม่ตรงกับห้องจริง
