@@ -4,7 +4,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { exportAsJson, importFromJson } from '../utils/storage'
 import { useToast } from '../contexts/ToastContext'
 
-export const Toolbar: React.FC<{ onOpenSettings: () => void }> = ({ onOpenSettings }) => {
+export const Toolbar: React.FC<{ onOpenSettings: () => void; onOpenSessions: () => void }> = ({ onOpenSettings, onOpenSessions }) => {
   const { newChat, deleteAll, conversations, replaceConversations, currentId, deleteChat } = useChat()
   const { settings, setSettings } = useSettings()
   const { push } = useToast()
@@ -20,7 +20,9 @@ export const Toolbar: React.FC<{ onOpenSettings: () => void }> = ({ onOpenSettin
   }
 
   return (
-    <div className="flex items-center gap-2 p-2 border-b dark:border-neutral-800">
+    <div className="sticky top-0 z-40 flex items-center gap-2 p-2 border-b dark:border-neutral-800 overflow-x-auto whitespace-nowrap bg-white/80 dark:bg-neutral-900/80 backdrop-blur">
+      <button onClick={onOpenSessions} className="md:hidden px-3 py-1 rounded bg-neutral-200 dark:bg-neutral-700">ห้อง</button>
+
       <button onClick={() => newChat()}
         className="px-3 py-1 rounded bg-blue-600 text-white">ห้องใหม่</button>
 
