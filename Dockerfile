@@ -1,6 +1,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
+# คัดลอกไฟล์ที่จำเป็นสำหรับการติดตั้ง dependencies ให้ชัดเจน
+COPY package.json ./
+COPY package-lock.json ./
 RUN npm ci || npm install
 COPY . .
 RUN npm run build
