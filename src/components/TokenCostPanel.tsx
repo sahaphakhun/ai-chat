@@ -6,7 +6,8 @@ import { costUSD, formatUSD } from '../utils/cost'
 
 export const TokenCostPanel: React.FC = () => {
   const { settings, setSettings } = useSettings()
-  const { conversations, currentId, index } = useChat()
+  const { state } = useChat()
+  const { conversations, currentId, index } = state
   const conv = currentId ? conversations[currentId] : undefined
   const stats = useMemo(() => countTokensConversation(conv?.messages ?? []), [conv?.messages])
 
@@ -21,7 +22,7 @@ export const TokenCostPanel: React.FC = () => {
     let totalOutput = 0
     let totalConversations = 0
     
-    index.sessionIds.forEach(id => {
+    index.sessionIds.forEach((id: string) => {
       const conversation = conversations[id]
       if (conversation?.messages?.length > 0) {
         const convStats = countTokensConversation(conversation.messages)
