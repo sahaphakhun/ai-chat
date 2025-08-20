@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { Conversation, Message } from '../types'
+import type { Conversation, Message, TokenUsage } from '../types'
 import { loadAll, saveAll, type IndexRecord } from '../utils/storage'
 import { logger } from '../utils/logger'
 import { useSettings } from './SettingsContext'
@@ -36,6 +36,7 @@ type ChatAction =
   | { type: 'START_ASSISTANT_MESSAGE'; payload: { conversationId: string; messageId: string } }
   | { type: 'APPEND_ASSISTANT_DELTA'; payload: { conversationId: string; messageId: string; delta: string } }
   | { type: 'COMPLETE_ASSISTANT_MESSAGE'; payload: { conversationId: string } }
+  | { type: 'UPDATE_CONVERSATION_USAGE'; payload: { conversationId: string; usage: TokenUsage } }
   | { type: 'REPLACE_CONVERSATIONS'; payload: Record<string, Conversation> }
 
 // Initial state
@@ -211,6 +212,35 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       
       const updatedConversation: Conversation = {
         ...conversation,
+        updatedAt: Date.now()
+      }
+      
+      return {
+        ...state,
+        conversations: {
+          ...state.conversations,
+          [conversationId]: updatedConversation
+        }
+      }
+    }
+    
+    case 'UPDATE_CONVERSATION_USAGE': {
+      const { conversationId, usage } = action.payload
+      const conversation = state.conversations[conversationId]
+      if (!conversation) return state
+      
+      // Accumulate usage data
+      const currentUsage = conversation.totalUsage
+      const newTotalUsage: TokenUsage = currentUsage ? {
+        prompt_tokens: currentUsage.prompt_tokens + usage.prompt_tokens,
+        completion_tokens: currentUsage.completion_tokens + usage.completion_tokens,
+        total_tokens: currentUsage.total_tokens + usage.total_tokens,
+        cached_tokens: (currentUsage.cached_tokens || 0) + (usage.cached_tokens || 0)
+      } : usage
+      
+      const updatedConversation: Conversation = {
+        ...conversation,
+        totalUsage: newTotalUsage,
         updatedAt: Date.now()
       }
       
@@ -438,6 +468,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       logger.info('assistant', 'จบ assistant message', { conversationId: state.currentId })
     }, [state.currentId]),
+    
+    updateConversationUsage: useCallback((conversationId: string, usage: TokenUsage) => {
+      dispatch({ 
+        type: 'UPDATE_CONVERSATION_USAGE', 
+        payload: { conversationId, usage } 
+      })
+      logger.info('usage', 'อัปเดต usage data', { conversationId, usage })
+    }, []),
     
     replaceConversations: useCallback((conversations: Record<string, Conversation>) => {
       dispatch({ type: 'REPLACE_CONVERSATIONS', payload: conversations })

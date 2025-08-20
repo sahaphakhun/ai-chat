@@ -1,4 +1,4 @@
-import type { Message } from '../types'
+import type { Message, TokenUsage } from '../types'
 import { logger } from './logger'
 
 export async function listModels(apiKey: string) {
@@ -24,7 +24,7 @@ export type StreamOptions = {
   systemPrompt?: string
   messages: Message[]
   onChunk: (delta: string) => void
-  onDone: () => void
+  onDone: (usage?: TokenUsage) => void
   onError: (err: unknown) => void
   abortSignal?: AbortSignal
 }
@@ -49,6 +49,7 @@ export async function streamChat(opts: StreamOptions) {
 
   const decoder = new TextDecoder()
   let buffer = ''
+  let accumulatedUsage: TokenUsage | undefined
 
   async function readSseStream(stream: ReadableStream<Uint8Array>) {
     const reader = stream.getReader()
@@ -63,8 +64,8 @@ export async function streamChat(opts: StreamOptions) {
         if (!trimmed.startsWith('data:')) continue
         const data = trimmed.replace(/^data:\s*/, '')
         if (data === '[DONE]') {
-          logger.info('openai', 'streamChat: done')
-          onDone()
+          logger.info('openai', 'streamChat: done', { usage: accumulatedUsage })
+          onDone(accumulatedUsage)
           return
         }
         try {
@@ -72,6 +73,19 @@ export async function streamChat(opts: StreamOptions) {
           // server proxy ส่ง { delta } ส่วน OpenAI ส่ง choices[].delta.content
           const delta = json?.delta ?? json?.choices?.[0]?.delta?.content ?? ''
           const errMsg = json?.error as string | undefined
+          
+          // Extract usage information from the response
+          const usage = json?.usage
+          if (usage) {
+            accumulatedUsage = {
+              prompt_tokens: usage.prompt_tokens || 0,
+              completion_tokens: usage.completion_tokens || 0,
+              total_tokens: usage.total_tokens || 0,
+              cached_tokens: usage.prompt_tokens_details?.cached_tokens
+            }
+            logger.debug('openai', 'streamChat: usage received', accumulatedUsage)
+          }
+          
           if (errMsg) return onError(new Error(errMsg))
           if (delta) {
             logger.debug('openai', 'streamChat: chunk', { bytes: (delta as string).length, preview: (delta as string).slice(0, 200) })
@@ -82,7 +96,7 @@ export async function streamChat(opts: StreamOptions) {
         }
       }
     }
-    onDone()
+    onDone(accumulatedUsage)
   }
 
   try {
