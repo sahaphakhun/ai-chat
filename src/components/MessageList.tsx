@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
 import { costUSD, formatUSD } from '../utils/cost'
 import type { Message } from '../types'
@@ -6,12 +6,33 @@ import type { Message } from '../types'
 export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => {
   const { settings } = useSettings()
   const bottomRef = useRef<HTMLDivElement>(null)
-  
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isUserScrolling, setIsUserScrolling] = useState(false)
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
 
-  
+  // ตรวจสอบว่าผู้ใช้กำลังเลื่อนหรือไม่
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    const container = containerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50 // ให้ buffer 50px
+      
+      setIsUserScrolling(!isAtBottom)
+      setShouldAutoScroll(isAtBottom)
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // เลื่อนลงอัตโนมัติเฉพาะเมื่อผู้ใช้อยู่ที่ด้านล่าง
+  useEffect(() => {
+    if (shouldAutoScroll && !isUserScrolling) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, shouldAutoScroll, isUserScrolling])
 
   const getMessageCost = (message: Message) => {
     if (!message.tokens) return null
@@ -22,7 +43,10 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+    <div 
+      ref={containerRef}
+      className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin"
+    >
       {messages.map((m) => (
         <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
           <div className={`max-w-[85%] md:max-w-2xl lg:max-w-3xl ${m.role === 'user' ? 'order-2' : 'order-1'}`}>
@@ -68,6 +92,35 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
         </div>
       ))}
       <div ref={bottomRef} />
+      
+      {/* ปุ่มกลับไปด้านล่าง */}
+      {isUserScrolling && (
+        <div className="fixed bottom-20 right-6 z-10">
+          <button
+            onClick={() => {
+              bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+              setShouldAutoScroll(true)
+              setIsUserScrolling(false)
+            }}
+            className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all duration-200 hover:scale-105"
+            title="กลับไปด้านล่าง"
+          >
+            <svg 
+              className="w-5 h-5" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M19 14l-7 7m0 0l-7-7m7 7V3" 
+              />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
