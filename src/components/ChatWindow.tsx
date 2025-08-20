@@ -30,15 +30,32 @@ export const ChatWindow: React.FC = () => {
   const stats = countTokensConversation(messages)
   const inCost = costUSD(stats.input, settings.inPricePerK)
   const outCost = costUSD(stats.output, settings.outPricePerK)
+  
+  // Debug: ตรวจสอบ state
+  console.log('ChatWindow render:', { 
+    currentId, 
+    messagesCount: messages.length, 
+    messages,
+    conversations: Object.keys(conversations),
+    currentConversation: conversations[currentId!]
+  })
 
   const onSend = async (text: string) => {
+    console.log('ChatWindow: onSend called with text:', text)
     if (!currentId) {
       push({ type: 'error', msg: 'กำลังโหลดห้องสนทนา โปรดลองอีกครั้ง' })
       logger.warn('chat', 'พยายามส่งข้อความขณะยังไม่มีห้อง')
       return
     }
     logger.info('message', 'ผู้ใช้ส่งข้อความ', { length: text.length, preview: text.slice(0, 80) })
+    console.log('ChatWindow: calling addUserAndStartAssistant with currentId:', currentId)
     const assistId = addUserAndStartAssistant({ role: 'user', content: text, tokens: countTokensText(text) })
+    console.log('ChatWindow: addUserAndStartAssistant returned assistId:', assistId)
+    if (!assistId) {
+      push({ type: 'error', msg: 'ไม่สามารถเริ่มการสนทนาได้' })
+      return
+    }
+    console.log('ChatWindow: setting loading to true')
     setLoading(true)
     const controller = new AbortController()
     abortRef.current = controller
@@ -53,12 +70,16 @@ export const ChatWindow: React.FC = () => {
     logger.debug('chat', 'เริ่มสตรีมคำตอบ', { model, hasApiKey: !!apiKey, history: messages.length })
 
     try {
+      console.log('ChatWindow: calling streamChat with payloadMessages:', payloadMessages)
       await streamChat({
         apiKey,
         model,
         systemPrompt: settings.systemPrompt,
         messages: payloadMessages,
-        onChunk: (d) => appendAssistantDelta(assistId, d),
+        onChunk: (d) => {
+          console.log('ChatWindow: onChunk called with delta:', d)
+          appendAssistantDelta(assistId, d)
+        },
         onDone: () => { endAssistant(); setLoading(false); logger.info('assistant', 'สตรีมเสร็จสิ้น') },
         onError: (e) => {
           const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
@@ -104,6 +125,12 @@ export const ChatWindow: React.FC = () => {
 
   return (
     <div className="flex flex-col flex-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+      {/* Debug: แสดงข้อมูล messages */}
+      <div className="p-2 bg-yellow-100 text-xs">
+        Debug: messages count = {messages.length}, currentId = {currentId}, 
+        conversations keys = {Object.keys(conversations).join(', ')},
+        conv exists = {!!conv}, conv messages = {conv?.messages?.length || 0}
+      </div>
       <MessageList messages={messages} />
       
       {/* Status Bar */}
