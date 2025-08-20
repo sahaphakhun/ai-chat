@@ -10,7 +10,7 @@
     "lint": "eslint . --ext .ts,.tsx -c .eslintrc.cjs",
     "format": "prettier --write .",
     "test": "vitest run",
-    "prepare": "husky"
+    "prepare": "node -e \"try{require('husky').install()}catch(e){}\""
   },
   "dependencies": {
     "classnames": "^2.5.1",
