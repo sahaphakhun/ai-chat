@@ -81,17 +81,24 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })()
   }, [])
 
-  // ฟังก์ชันบันทึก
+  // ฟังก์ชันบันทึก (สำหรับฟังก์ชันที่ยังไม่ได้อัปเดต UI เอง)
   const save = async (nextConv: Record<string, Conversation>, nextIdx?: IndexRecord) => {
     // แนบ settings ปัจจุบันเข้า index ก่อนบันทึกเพื่อเซิร์ฟเวอร์เก็บค่าตั้งค่า
     const idx = { ...(nextIdx ?? index), settings: settings as any }
     // อัปเดต UI ทันที จากนั้นค่อยบันทึกแบบพื้นหลัง
     setConversations(nextConv)
-    console.log('ChatContext: save - updating conversations state:', { 
-      conversationsCount: Object.keys(nextConv).length,
-      currentId,
-      currentMessagesCount: nextConv[currentId!]?.messages?.length || 0
-    })
+
+    if (nextIdx) setIndex(nextIdx)
+    try {
+      await saveAll(idx, nextConv)
+    } catch (e) {
+      logger.error('storage', 'บันทึกข้อมูลล้มเหลว', { error: String(e) })
+    }
+  }
+
+  // ฟังก์ชันบันทึกแบบไม่อัปเดต UI (สำหรับฟังก์ชันที่อัปเดต UI เองแล้ว)
+  const saveOnly = async (nextConv: Record<string, Conversation>, nextIdx?: IndexRecord) => {
+    const idx = { ...(nextIdx ?? index), settings: settings as any }
     if (nextIdx) setIndex(nextIdx)
     try {
       await saveAll(idx, nextConv)
@@ -188,13 +195,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const next = { ...conversations, [currentId]: nextConv }
     // อัปเดต UI ทันที แล้วค่อยบันทึกแบบพื้นหลัง
     setConversations(next)
-    console.log('ChatContext: addUserAndStartAssistant - updating state:', { 
-      currentId, 
-      oldMessagesCount: conv.messages.length, 
-      newMessagesCount: nextConv.messages.length,
-      newMessages: nextConv.messages 
-    })
-    void save(next)
+
+    void saveOnly(next)
     logger.info('message', 'เพิ่มข้อความ', { conversationId: currentId, role: msg.role, tokens: (msg as any).tokens })
     logger.debug('assistant', 'เริ่ม assistant message', { id: assistId, conversationId: currentId })
     return assistId
@@ -236,7 +238,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...conversations,
       [currentId]: { ...conv, updatedAt: Date.now() },
     }
-    void save(next)
+    // อัปเดต UI ทันที แล้วค่อยบันทึกแบบพื้นหลัง  
+    setConversations(next)
+
+    void saveOnly(next)
     logger.info('assistant', 'จบ assistant message', { conversationId: currentId })
   }
 

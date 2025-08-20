@@ -31,32 +31,24 @@ export const ChatWindow: React.FC = () => {
   const inCost = costUSD(stats.input, settings.inPricePerK)
   const outCost = costUSD(stats.output, settings.outPricePerK)
   
-  // Debug: ตรวจสอบ state
-  console.log('ChatWindow render:', { 
-    currentId, 
-    messagesCount: messages.length, 
-    messages,
-    conversations: Object.keys(conversations),
-    currentConversation: conversations[currentId!],
-    loading
-  })
+
 
   const onSend = async (text: string) => {
-    console.log('ChatWindow: onSend called with text:', text)
+
     if (!currentId) {
       push({ type: 'error', msg: 'กำลังโหลดห้องสนทนา โปรดลองอีกครั้ง' })
       logger.warn('chat', 'พยายามส่งข้อความขณะยังไม่มีห้อง')
       return
     }
     logger.info('message', 'ผู้ใช้ส่งข้อความ', { length: text.length, preview: text.slice(0, 80) })
-    console.log('ChatWindow: calling addUserAndStartAssistant with currentId:', currentId)
+
     const assistId = addUserAndStartAssistant({ role: 'user', content: text, tokens: countTokensText(text) })
-    console.log('ChatWindow: addUserAndStartAssistant returned assistId:', assistId)
+
     if (!assistId) {
       push({ type: 'error', msg: 'ไม่สามารถเริ่มการสนทนาได้' })
       return
     }
-    console.log('ChatWindow: setting loading to true')
+
     setLoading(true)
     const controller = new AbortController()
     abortRef.current = controller
@@ -71,40 +63,31 @@ export const ChatWindow: React.FC = () => {
     logger.debug('chat', 'เริ่มสตรีมคำตอบ', { model, hasApiKey: !!apiKey, history: messages.length })
 
     try {
-      console.log('ChatWindow: calling streamChat with payloadMessages:', payloadMessages)
+
       await streamChat({
         apiKey,
         model,
         systemPrompt: settings.systemPrompt,
         messages: payloadMessages,
-        onChunk: (d) => {
-          console.log('ChatWindow: onChunk called with delta:', d)
-          appendAssistantDelta(assistId, d)
-        },
+        onChunk: (d) => appendAssistantDelta(assistId, d),
         onDone: () => { 
-          console.log('ChatWindow: onDone called')
           endAssistant(); 
-          console.log('ChatWindow: setting loading to false in onDone')
           setLoading(false); 
           logger.info('assistant', 'สตรีมเสร็จสิ้น') 
         },
         onError: (e) => {
-          console.log('ChatWindow: onError called with error:', e)
           const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
           push({ type: 'error', msg })
           endAssistant()
-          console.log('ChatWindow: setting loading to false in onError')
           setLoading(false)
           logger.error('assistant', 'สตรีมผิดพลาด', { error: String(e) })
         },
         abortSignal: controller.signal
       })
     } catch (e) {
-      console.log('ChatWindow: catch block called with error:', e)
       const msg = e instanceof Error ? e.message : 'การส่งคำขอล้มเหลว'
       push({ type: 'error', msg })
       endAssistant()
-      console.log('ChatWindow: setting loading to false in catch')
       setLoading(false)
       logger.error('assistant', 'ส่งคำขอเริ่มสตรีมล้มเหลว', { error: String(e) })
     }
@@ -142,20 +125,7 @@ export const ChatWindow: React.FC = () => {
 
   return (
     <div className="flex flex-col flex-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-      {/* Debug: แสดงข้อมูล messages */}
-      <div className="p-2 bg-yellow-100 text-xs">
-        Debug: messages count = {messages.length}, currentId = {currentId}, 
-        conversations keys = {Object.keys(conversations).join(', ')},
-        conv exists = {!!conv}, conv messages = {conv?.messages?.length || 0},
-        loading = {loading.toString()}, 
-        conv messages preview = {conv?.messages?.map(m => `${m.role}:${m.content.slice(0, 20)}`).join(', ') || 'none'},
-        conv id = {conv?.id || 'none'}, conv title = {conv?.title || 'none'},
-        conversations count = {Object.keys(conversations).length},
-        conversations preview = {Object.entries(conversations).map(([id, conv]) => `${id}:${conv.messages.length}msgs`).join(', ')},
-        currentId in conversations = {currentId ? (currentId in conversations).toString() : 'no currentId'},
-        conversations[currentId] = {currentId ? JSON.stringify(conversations[currentId]) : 'no currentId'},
-        conversations = {JSON.stringify(conversations)}
-      </div>
+
       <MessageList messages={messages} />
       
       {/* Status Bar */}

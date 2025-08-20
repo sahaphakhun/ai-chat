@@ -7,8 +7,7 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
   const { settings } = useSettings()
   const bottomRef = useRef<HTMLDivElement>(null)
   
-  // Debug: ตรวจสอบ props messages
-  console.log('MessageList render:', { messagesCount: messages.length, messages })
+
   
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
