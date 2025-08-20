@@ -80,7 +80,12 @@ export const ChatWindow: React.FC = () => {
           console.log('ChatWindow: onChunk called with delta:', d)
           appendAssistantDelta(assistId, d)
         },
-        onDone: () => { endAssistant(); setLoading(false); logger.info('assistant', 'สตรีมเสร็จสิ้น') },
+        onDone: () => { 
+          console.log('ChatWindow: onDone called')
+          endAssistant(); 
+          setLoading(false); 
+          logger.info('assistant', 'สตรีมเสร็จสิ้น') 
+        },
         onError: (e) => {
           const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
           push({ type: 'error', msg })
