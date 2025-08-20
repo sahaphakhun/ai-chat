@@ -81,7 +81,7 @@ export const ChatWindow: React.FC = () => {
           
           if (usage) {
             // Update conversation with actual usage data
-            actions.updateConversationUsage(state.currentId!, usage)
+            ;(actions as any).updateConversationUsage(state.currentId!, usage)
             logger.info('assistant', 'สตรีมเสร็จสิ้น พร้อม usage data', { usage })
           } else {
             logger.info('assistant', 'สตรีมเสร็จสิ้น (ไม่มี usage data)')
