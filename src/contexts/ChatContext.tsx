@@ -19,6 +19,7 @@ type ChatCtxType = {
   setCurrentId: (id: string) => void
   index: IndexRecord
   addMessage: (msg: Omit<Message, 'id'>) => void
+  addUserAndStartAssistant: (msg: Omit<Message, 'id'>) => string
   startAssistant: () => string // returns assistant message id
   appendAssistantDelta: (id: string, delta: string) => void
   endAssistant: () => void
@@ -160,6 +161,32 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logger.info('message', 'เพิ่มข้อความ', { conversationId: currentId, role: msg.role, tokens: (msg as any).tokens })
   }
 
+  // ป้องกัน race condition ระหว่างการเพิ่มข้อความผู้ใช้และเริ่ม assistant
+  const addUserAndStartAssistant = (msg: Omit<Message, 'id'>) => {
+    if (!currentId) return ''
+    const userId = uuid()
+    const assistId = uuid()
+    const conv = conversations[currentId]
+    const nextTitle = conv.messages.length === 0 && msg.role === 'user'
+      ? (msg.content.split('\n')[0].slice(0, 60) || 'สนทนาใหม่')
+      : conv.title
+    const nextConv: Conversation = {
+      ...conv,
+      updatedAt: Date.now(),
+      title: nextTitle,
+      messages: [
+        ...conv.messages,
+        { ...msg, id: userId } as Message,
+        { id: assistId, role: 'assistant', content: '' } as Message,
+      ],
+    }
+    const next = { ...conversations, [currentId]: nextConv }
+    void save(next)
+    logger.info('message', 'เพิ่มข้อความ', { conversationId: currentId, role: msg.role, tokens: (msg as any).tokens })
+    logger.debug('assistant', 'เริ่ม assistant message', { id: assistId, conversationId: currentId })
+    return assistId
+  }
+
   const startAssistant = () => {
     if (!currentId) return ''
     const id = uuid()
@@ -216,6 +243,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentId,
       index,
       addMessage,
+      addUserAndStartAssistant,
       startAssistant,
       appendAssistantDelta,
       endAssistant,

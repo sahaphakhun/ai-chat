@@ -11,7 +11,7 @@ import { logger } from '../utils/logger'
 import type { Message } from '../types'
 
 export const ChatWindow: React.FC = () => {
-  const { conversations, currentId, addMessage, startAssistant, appendAssistantDelta, endAssistant, newChat } = useChat()
+  const { conversations, currentId, addUserAndStartAssistant, appendAssistantDelta, endAssistant, newChat } = useChat()
   const { settings } = useSettings()
   const { push } = useToast()
   const abortRef = useRef<AbortController | null>(null)
@@ -38,10 +38,8 @@ export const ChatWindow: React.FC = () => {
       return
     }
     logger.info('message', 'ผู้ใช้ส่งข้อความ', { length: text.length, preview: text.slice(0, 80) })
-    addMessage({ role: 'user', content: text, tokens: countTokensText(text) })
-
+    const assistId = addUserAndStartAssistant({ role: 'user', content: text, tokens: countTokensText(text) })
     setLoading(true)
-    const assistId = startAssistant()
     const controller = new AbortController()
     abortRef.current = controller
     // ส่งประวัติโดยรวม "รวมข้อความล่าสุดของผู้ใช้" ไปยังสตรีม เพื่อหลีกเลี่ยงปัญหา state ยังไม่อัปเดตทันที
