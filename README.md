@@ -19,10 +19,9 @@ npm run dev
 ```
 
 ### การตั้งค่า API Key ค่าเริ่มต้น
-- ตั้งค่าผ่านตัวแปรสภาพแวดล้อม `VITE_DEFAULT_API_KEY` ระหว่าง build/dev
+- ตั้งค่าผ่านตัวแปรสภาพแวดล้อม `VITE_DEFAULT_API_KEY` ระหว่าง build/dev เท่านั้น (ไม่มี fallback ในซอร์สโค้ด)
   - ตัวอย่าง (Unix): `VITE_DEFAULT_API_KEY="sk-..." npm run dev`
   - ตัวอย่าง (Windows PowerShell): `$env:VITE_DEFAULT_API_KEY="sk-..."; npm run dev`
-- หากไม่ตั้งค่า แอปจะ fallback เป็นค่าดีฟอลต์ที่กำหนดในโค้ด
 
 ## Build production
 ```bash
