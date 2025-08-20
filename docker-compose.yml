@@ -1,5 +1,25 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: chat
+      POSTGRES_PASSWORD: chat
+      POSTGRES_DB: chatdb
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   web:
     build: .
+    environment:
+      - DATABASE_URL=postgres://chat:chat@db:5432/chatdb
+      - PGSSLMODE=disable
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      - db
     ports:
       - "5173:3000"
+
+volumes:
+  db-data:

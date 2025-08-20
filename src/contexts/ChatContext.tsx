@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import type { Conversation, Message } from '../types'
 import { loadAll, saveAll, type IndexRecord } from '../utils/storage'
 import { logger } from '../utils/logger'
+import { useSettings } from './SettingsContext'
 
 // ใช้ฟังก์ชัน uuid มาตรฐานของเบราว์เซอร์
 const uuid = () => crypto.randomUUID()
@@ -44,6 +45,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     settings: undefined as any,
     sessionIds: [],
   })
+  const { settings, setSettings } = useSettings()
 
   // โหลดข้อมูลเก่า
   useEffect(() => {
@@ -54,7 +56,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // บูตสแตรป: หากไม่มี index หรือไม่มี sessionIds หรือไม่มีข้อมูลห้อง ให้สร้างห้องใหม่
       if (!index0 || (index0.sessionIds?.length ?? 0) === 0 || Object.keys(conversations0 || {}).length === 0) {
         const conv = newConversation()
-        index0 = { useDB: index0?.useDB ?? false, settings: (index0?.settings as any) ?? ({} as any), sessionIds: [conv.id] }
+        index0 = { useDB: index0?.useDB ?? false, settings: (index0?.settings as any) ?? (settings as any), sessionIds: [conv.id] }
         conversations0 = { [conv.id]: conv }
       }
       // ทำความสะอาด sessionIds ที่ไม่ตรงกับห้องจริง
@@ -62,6 +64,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (validIds.length !== index0.sessionIds.length) {
         index0 = { ...index0, sessionIds: (validIds.length ? validIds : Object.keys(conversations0)) }
       }
+      // ซิงค์ settings จากเซิร์ฟเวอร์เข้ากับ SettingsContext ถ้ามี
+      try {
+        if (index0.settings) {
+          setSettings(s => ({ ...s, ...index0.settings }))
+        } else {
+          // หาก index ไม่มี settings ให้ฝังค่าปัจจุบันลงไปเพื่อให้ถูกบันทึกขึ้นเซิร์ฟเวอร์ครั้งถัดไป
+          index0 = { ...index0, settings: settings as any }
+        }
+      } catch {}
       setIndex(index0)
       setConversations(conversations0)
       setCurrentId(index0.sessionIds[0] ?? Object.keys(conversations0)[0] ?? null)
@@ -71,7 +82,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ฟังก์ชันบันทึก
   const save = async (nextConv: Record<string, Conversation>, nextIdx?: IndexRecord) => {
-    const idx = nextIdx ?? index
+    // แนบ settings ปัจจุบันเข้า index ก่อนบันทึกเพื่อเซิร์ฟเวอร์เก็บค่าตั้งค่า
+    const idx = { ...(nextIdx ?? index), settings: settings as any }
     // อัปเดต UI ทันที จากนั้นค่อยบันทึกแบบพื้นหลัง
     setConversations(nextConv)
     if (nextIdx) setIndex(nextIdx)
@@ -81,6 +93,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.error('storage', 'บันทึกข้อมูลล้มเหลว', { error: String(e) })
     }
   }
+
+  // เมื่อผู้ใช้เปลี่ยน settings ให้ trigger บันทึกขึ้นเซิร์ฟเวอร์ด้วย (ถ้ามีข้อมูลห้องแล้ว)
+  useEffect(() => {
+    if (Object.keys(conversations).length === 0) return
+    const nextIdx = { ...index, settings: settings as any }
+    void save(conversations, nextIdx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings])
 
   const newChat = () => {
     const conv = newConversation()

@@ -97,16 +97,6 @@ export const ChatWindow: React.FC = () => {
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               เริ่มต้นการสนทนากับ AI โดยพิมพ์ข้อความด้านล่าง
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div className="font-medium text-blue-900 dark:text-blue-300">💡 เคล็ดลับ</div>
-                <div className="text-blue-700 dark:text-blue-400">ใช้คำสั่งที่ชัดเจนเพื่อผลลัพธ์ที่ดี</div>
-              </div>
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <div className="font-medium text-green-900 dark:text-green-300">🔧 ตั้งค่า</div>
-                <div className="text-green-700 dark:text-green-400">ปรับแต่ง API Key และโมเดลในตั้งค่า</div>
-              </div>
-            </div>
           </div>
         </div>
         <MessageInput onSend={onSend} disabled={loading || !currentId} />

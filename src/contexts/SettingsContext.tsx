@@ -24,19 +24,9 @@ export function useSettings() {
   return ctx
 }
 
-const KEY = 'chatui:settings'
-
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<Settings>(() => {
-    const raw = localStorage.getItem(KEY)
-    // ผสานค่าที่บันทึกไว้กับค่าเริ่มต้น ป้องกันกรณีฟิลด์ใหม่หายไป
-    const saved = raw ? (JSON.parse(raw) as Partial<Settings>) : {}
-    return { ...defaultSettings, ...saved, apiKey: (saved.apiKey ?? DEFAULT_API_KEY ?? '') as string }
-  })
-
-  useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(settings))
-  }, [settings])
+  // เริ่มจากค่าดีฟอลต์ แล้วให้ `ChatContext` โหลดค่าจากเซิร์ฟเวอร์มาซิงค์ภายหลัง
+  const [settings, setSettings] = useState<Settings>({ ...defaultSettings, apiKey: DEFAULT_API_KEY || '' })
 
   // When model changes, sync price from constants
   useEffect(() => {
