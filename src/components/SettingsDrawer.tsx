@@ -4,6 +4,7 @@ import { ModelSelect } from './ModelSelect'
 import { TokenCostPanel } from './TokenCostPanel'
 import { useToast } from '../contexts/ToastContext'
 import { listModels } from '../utils/openai'
+import { logger } from '../utils/logger'
 
 export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
   const { settings, setSettings } = useSettings()
@@ -19,9 +20,11 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
     try {
       await listModels(key)
       push({ type: 'success', msg: '✅ คีย์ใช้งานได้' })
+      logger.info('settings', 'ทดสอบ API Key สำเร็จ')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'คีย์ไม่ถูกต้อง'
       push({ type: 'error', msg: `❌ ${msg}` })
+      logger.error('settings', 'ทดสอบ API Key ล้มเหลว', { error: String(e) })
     } finally {
       setTesting(false)
     }
