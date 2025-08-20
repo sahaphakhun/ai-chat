@@ -11,7 +11,7 @@ export const ModelSelect: React.FC = () => {
 
   const refresh = async () => {
     try {
-      const data = await listModels(settings.apiKey)
+      const data = await listModels(settings.apiKey.trim())
       const ids = data.map(d => d.id)
       setModels(ids)
       push({ type: 'success', msg: 'อัปเดตรายชื่อโมเดลจาก API แล้ว' })

@@ -26,7 +26,7 @@ export const ChatWindow: React.FC = () => {
     const controller = new AbortController()
     abortRef.current = controller
     await streamChat({
-      apiKey: settings.apiKey,
+      apiKey: settings.apiKey.trim(),
       model: settings.model,
       systemPrompt: settings.systemPrompt,
       messages,
