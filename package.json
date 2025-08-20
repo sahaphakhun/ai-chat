@@ -9,8 +9,7 @@
     "preview": "vite preview --port 5173",
     "lint": "eslint . --ext .ts,.tsx -c .eslintrc.cjs",
     "format": "prettier --write .",
-    "test": "vitest run",
-    "prepare": "node -e \"try{require('husky').install()}catch(e){}\""
+    "test": "vitest run"
   },
   "dependencies": {
     "classnames": "^2.5.1",
@@ -35,7 +34,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "4.6.2",
     "eslint-plugin-react-refresh": "^0.4.11",
-    "husky": "^9.1.6",
+    
     "jsdom": "^25.0.0",
     "postcss": "^8.4.41",
     "prettier": "^3.3.3",
