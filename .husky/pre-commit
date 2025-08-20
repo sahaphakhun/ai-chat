@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
 
-npm run lint
-npm test
+# เรียก ESLint ด้วย flat config โดยตรงเพื่อลดปัญหาธงไม่รองรับ
+npx --yes eslint . --config eslint.config.js || exit 1
+
+# รันเทสต์แบบไม่โต้ตอบ ถ้ามี
+npm test --silent || exit 1

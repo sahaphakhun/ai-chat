@@ -6,6 +6,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { streamChat } from '../utils/openai'
 import { useToast } from '../contexts/ToastContext'
 import { countTokensText } from '../utils/token'
+import type { Message } from '../types'
 
 export const ChatWindow: React.FC = () => {
   const { conversations, currentId, addMessage, startAssistant, appendAssistantDelta, endAssistant } = useChat()
@@ -25,9 +26,9 @@ export const ChatWindow: React.FC = () => {
     const controller = new AbortController()
     abortRef.current = controller
     // ส่งประวัติโดยรวม "รวมข้อความล่าสุดของผู้ใช้" ไปยังสตรีม เพื่อหลีกเลี่ยงปัญหา state ยังไม่อัปเดตทันที
-    const payloadMessages = [
+    const payloadMessages: Message[] = [
       ...messages,
-      { id: 'temp-user', role: 'user', content: text }
+      { id: 'temp-user', role: 'user', content: text } as Message
     ]
 
     await streamChat({
