@@ -2,8 +2,10 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import type { Settings } from '../types'
 import { MODEL_PRICING } from '../constants/modelPricing'
 
+const DEFAULT_API_KEY = (import.meta as any)?.env?.VITE_DEFAULT_API_KEY ?? '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'
+
 const defaultSettings: Settings = {
-  apiKey: '',
+  apiKey: DEFAULT_API_KEY,
   systemPrompt: '',
   model: 'gpt-5',
   inPricePerK: MODEL_PRICING[0].inK,
