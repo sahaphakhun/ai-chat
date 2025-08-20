@@ -1,278 +1,244 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import type { Conversation, Message } from '../types'
-import { loadAll, saveAll, type IndexRecord } from '../utils/storage'
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
+import type { Conversation, Message, ChatState } from '../types'
+import { StorageService } from '../utils/storage'
 import { logger } from '../utils/logger'
-import { useSettings } from './SettingsContext'
 
-// ใช้ฟังก์ชัน uuid มาตรฐานของเบราว์เซอร์
-const uuid = () => crypto.randomUUID()
+// Action types
+type ChatAction =
+  | { type: 'SET_CONVERSATIONS'; payload: Record<string, Conversation> }
+  | { type: 'SET_CURRENT_CONVERSATION'; payload: string | null }
+  | { type: 'ADD_MESSAGE'; payload: { conversationId: string; message: Message } }
+  | { type: 'UPDATE_MESSAGE'; payload: { conversationId: string; messageId: string; content: string } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'CREATE_CONVERSATION'; payload: Conversation }
+  | { type: 'DELETE_CONVERSATION'; payload: string }
+  | { type: 'LOAD_DATA'; payload: { conversations: Record<string, Conversation>; currentConversationId: string | null } }
 
-function newConversation(): Conversation {
-  const id = uuid()
-  const now = Date.now()
-  return { id, title: 'สนทนาใหม่', createdAt: now, updatedAt: now, messages: [], model: 'gpt-5' }
+// Initial state
+const initialState: ChatState = {
+  conversations: {},
+  currentConversationId: null,
+  isLoading: false,
+  error: null
 }
 
-type ChatCtxType = {
-  conversations: Record<string, Conversation>
-  currentId: string | null
-  setCurrentId: (id: string) => void
-  index: IndexRecord
-  addMessage: (msg: Omit<Message, 'id'>) => void
-  addUserAndStartAssistant: (msg: Omit<Message, 'id'>) => string
-  startAssistant: () => string // returns assistant message id
-  appendAssistantDelta: (id: string, delta: string) => void
-  endAssistant: () => void
-  newChat: () => void
-  deleteChat: (id: string) => void
-  deleteAll: () => void
-  renameChat: (id: string, title: string) => void
-  replaceConversations: (next: Record<string, Conversation>) => void
-}
-
-const ChatCtx = createContext<ChatCtxType | null>(null)
-
-export function useChat() {
-  const ctx = useContext(ChatCtx)
-  if (!ctx) throw new Error('ChatCtx missing')
-  return ctx
-}
-
-export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [conversations, setConversations] = useState<Record<string, Conversation>>({})
-  const [currentId, setCurrentId] = useState<string | null>(null)
-  const [index, setIndex] = useState<IndexRecord>({
-    useDB: false,
-    settings: undefined as any,
-    sessionIds: [],
-  })
-  const { settings, setSettings } = useSettings()
-
-  // โหลดข้อมูลเก่า
-  useEffect(() => {
-    ;(async () => {
-      const { index: idx, conversations: convs } = await loadAll()
-      let index0: IndexRecord = idx ?? { useDB: false, settings: settings as any, sessionIds: [] }
-      let conversations0 = convs
-      // บูตสแตรป: หากไม่มี index หรือไม่มี sessionIds หรือไม่มีข้อมูลห้อง ให้สร้างห้องใหม่
-      if ((index0.sessionIds?.length ?? 0) === 0 || Object.keys(conversations0 || {}).length === 0) {
-        const conv = newConversation()
-        index0 = { useDB: index0.useDB ?? false, settings: (index0.settings as any) ?? (settings as any), sessionIds: [conv.id] }
-        conversations0 = { [conv.id]: conv }
+// Reducer
+function chatReducer(state: ChatState, action: ChatAction): ChatState {
+  switch (action.type) {
+    case 'LOAD_DATA':
+      return { 
+        ...state, 
+        conversations: action.payload.conversations,
+        currentConversationId: action.payload.currentConversationId
       }
-      // ทำความสะอาด sessionIds ที่ไม่ตรงกับห้องจริง
-      const validIds = (index0.sessionIds || []).filter(id => !!conversations0[id])
-      if (validIds.length !== index0.sessionIds.length) {
-        index0 = { ...index0, sessionIds: (validIds.length ? validIds : Object.keys(conversations0)) }
+    
+    case 'SET_CONVERSATIONS':
+      return { ...state, conversations: action.payload }
+    
+    case 'SET_CURRENT_CONVERSATION':
+      return { ...state, currentConversationId: action.payload }
+    
+    case 'ADD_MESSAGE': {
+      const { conversationId, message } = action.payload
+      const conversation = state.conversations[conversationId]
+      if (!conversation) return state
+      
+      const updatedConversation = {
+        ...conversation,
+        messages: [...conversation.messages, message],
+        updatedAt: Date.now()
       }
-      // ซิงค์ settings จากเซิร์ฟเวอร์เข้ากับ SettingsContext ถ้ามี
-      try {
-        if (index0.settings) {
-          setSettings(s => ({ ...s, ...index0.settings }))
-        } else {
-          // หาก index ไม่มี settings ให้ฝังค่าปัจจุบันลงไปเพื่อให้ถูกบันทึกขึ้นเซิร์ฟเวอร์ครั้งถัดไป
-          index0 = { ...index0, settings: settings as any }
+      
+      return {
+        ...state,
+        conversations: {
+          ...state.conversations,
+          [conversationId]: updatedConversation
         }
-      } catch {}
-      setIndex(index0)
-      setConversations(conversations0)
-      setCurrentId(index0.sessionIds[0] ?? Object.keys(conversations0)[0] ?? null)
-      logger.info('app', 'โหลดข้อมูลเริ่มต้นเสร็จสิ้น', { sessions: index0.sessionIds.length })
-    })()
+      }
+    }
+    
+    case 'UPDATE_MESSAGE': {
+      const { conversationId, messageId, content } = action.payload
+      const conversation = state.conversations[conversationId]
+      if (!conversation) return state
+      
+      const updatedMessages = conversation.messages.map(msg =>
+        msg.id === messageId ? { ...msg, content } : msg
+      )
+      
+      const updatedConversation = {
+        ...conversation,
+        messages: updatedMessages,
+        updatedAt: Date.now()
+      }
+      
+      return {
+        ...state,
+        conversations: {
+          ...state.conversations,
+          [conversationId]: updatedConversation
+        }
+      }
+    }
+    
+    case 'SET_LOADING':
+      return { ...state, isLoading: action.payload }
+    
+    case 'SET_ERROR':
+      return { ...state, error: action.payload }
+    
+    case 'CREATE_CONVERSATION': {
+      const conversation = action.payload
+      return {
+        ...state,
+        conversations: {
+          ...state.conversations,
+          [conversation.id]: conversation
+        },
+        currentConversationId: conversation.id
+      }
+    }
+    
+    case 'DELETE_CONVERSATION': {
+      const { [action.payload]: deleted, ...remaining } = state.conversations
+      return {
+        ...state,
+        conversations: remaining,
+        currentConversationId: state.currentConversationId === action.payload ? null : state.currentConversationId
+      }
+    }
+    
+    default:
+      return state
+  }
+}
+
+// Context
+const ChatContext = createContext<{
+  state: ChatState
+  dispatch: React.Dispatch<ChatAction>
+  actions: {
+    createConversation: () => string
+    addMessage: (conversationId: string, role: 'user' | 'assistant', content: string) => string
+    updateMessage: (conversationId: string, messageId: string, content: string) => void
+    setCurrentConversation: (id: string | null) => void
+    setLoading: (loading: boolean) => void
+    setError: (error: string | null) => void
+    deleteConversation: (id: string) => void
+  }
+} | null>(null)
+
+// Provider
+export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, dispatch] = useReducer(chatReducer, initialState)
+
+  // โหลดข้อมูลเมื่อเริ่มต้น
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const data = await StorageService.load()
+        dispatch({ 
+          type: 'LOAD_DATA', 
+          payload: { 
+            conversations: data.conversations, 
+            currentConversationId: data.currentConversationId 
+          } 
+        })
+        logger.info('chat', 'โหลดข้อมูลเริ่มต้นเสร็จสิ้น')
+      } catch (error) {
+        logger.error('chat', 'โหลดข้อมูลเริ่มต้นล้มเหลว', { error: String(error) })
+      }
+    }
+    loadData()
   }, [])
 
-  // ฟังก์ชันบันทึก (สำหรับฟังก์ชันที่ยังไม่ได้อัปเดต UI เอง)
-  const save = async (nextConv: Record<string, Conversation>, nextIdx?: IndexRecord) => {
-    // แนบ settings ปัจจุบันเข้า index ก่อนบันทึกเพื่อเซิร์ฟเวอร์เก็บค่าตั้งค่า
-    const idx = { ...(nextIdx ?? index), settings: settings as any }
-    // อัปเดต UI ทันที จากนั้นค่อยบันทึกแบบพื้นหลัง
-    setConversations(nextConv)
-
-    if (nextIdx) setIndex(nextIdx)
-    try {
-      await saveAll(idx, nextConv)
-    } catch (e) {
-      logger.error('storage', 'บันทึกข้อมูลล้มเหลว', { error: String(e) })
-    }
-  }
-
-  // ฟังก์ชันบันทึกแบบไม่อัปเดต UI (สำหรับฟังก์ชันที่อัปเดต UI เองแล้ว)
-  const saveOnly = async (nextConv: Record<string, Conversation>, nextIdx?: IndexRecord) => {
-    const idx = { ...(nextIdx ?? index), settings: settings as any }
-    if (nextIdx) setIndex(nextIdx)
-    try {
-      await saveAll(idx, nextConv)
-    } catch (e) {
-      logger.error('storage', 'บันทึกข้อมูลล้มเหลว', { error: String(e) })
-    }
-  }
-
-  // เมื่อผู้ใช้เปลี่ยน settings ให้ trigger บันทึกขึ้นเซิร์ฟเวอร์ด้วย (ถ้ามีข้อมูลห้องแล้ว)
+  // บันทึกข้อมูลเมื่อมีการเปลี่ยนแปลง
   useEffect(() => {
-    if (Object.keys(conversations).length === 0) return
-    const nextIdx = { ...index, settings: settings as any }
-    void save(conversations, nextIdx)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings])
-
-  const newChat = () => {
-    const conv = newConversation()
-    const next = { ...conversations, [conv.id]: conv }
-    const nextIdx = { ...index, sessionIds: [conv.id, ...index.sessionIds] }
-    setCurrentId(conv.id)
-    void save(next, nextIdx)
-    logger.info('chat', 'สร้างห้องใหม่', { id: conv.id })
-  }
-
-  const deleteChat = (id: string) => {
-    const next = { ...conversations }
-    delete next[id]
-    const nextIds = index.sessionIds.filter((x) => x !== id)
-    const nextIdx = { ...index, sessionIds: nextIds }
-    const nextCurrent = nextIds[0] ?? null
-    setCurrentId(nextCurrent)
-    void save(next, nextIdx)
-    logger.warn('chat', 'ลบห้อง', { id })
-  }
-
-  const deleteAll = () => {
-    const conv = newConversation()
-    const next = { [conv.id]: conv }
-    const nextIdx = { ...index, sessionIds: [conv.id] }
-    setCurrentId(conv.id)
-    void save(next, nextIdx)
-    logger.warn('chat', 'ลบทั้งหมดและสร้างห้องใหม่', { keepId: conv.id })
-  }
-
-  const renameChat = (id: string, title: string) => {
-    const conv = conversations[id]
-    if (!conv) return
-    const next = {
-      ...conversations,
-      [id]: { ...conv, title, updatedAt: Date.now() },
+    const saveData = async () => {
+      try {
+        await StorageService.saveConversations(state.conversations)
+        await StorageService.saveCurrentConversationId(state.currentConversationId)
+      } catch (error) {
+        logger.error('chat', 'บันทึกข้อมูลล้มเหลว', { error: String(error) })
+      }
     }
-    void save(next)
-    logger.info('chat', 'เปลี่ยนชื่อห้อง', { id, title })
-  }
+    saveData()
+  }, [state.conversations, state.currentConversationId])
 
-  const addMessage = (msg: Omit<Message, 'id'>) => {
-    if (!currentId) return
-    const id = uuid()
-    const conv = conversations[currentId]
-    const nextTitle = conv.messages.length === 0 && msg.role === 'user'
-      ? (msg.content.split('\n')[0].slice(0, 60) || 'สนทนาใหม่')
-      : conv.title
-    const nextConv = {
-      ...conv,
-      updatedAt: Date.now(),
-      title: nextTitle,
-      messages: [...conv.messages, { ...msg, id } satisfies Message],
+  const createConversation = useCallback(() => {
+    const id = crypto.randomUUID()
+    const conversation: Conversation = {
+      id,
+      title: 'สนทนาใหม่',
+      messages: [],
+      model: 'gpt-4o',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     }
-    const next = { ...conversations, [currentId]: nextConv }
-    void save(next)
-    logger.info('message', 'เพิ่มข้อความ', { conversationId: currentId, role: msg.role, tokens: (msg as any).tokens })
-  }
-
-  // ป้องกัน race condition ระหว่างการเพิ่มข้อความผู้ใช้และเริ่ม assistant
-  const addUserAndStartAssistant = (msg: Omit<Message, 'id'>) => {
-    if (!currentId) return ''
-    const userId = uuid()
-    const assistId = uuid()
-    const conv = conversations[currentId]
-    const nextTitle = conv.messages.length === 0 && msg.role === 'user'
-      ? (msg.content.split('\n')[0].slice(0, 60) || 'สนทนาใหม่')
-      : conv.title
-    const nextConv: Conversation = {
-      ...conv,
-      updatedAt: Date.now(),
-      title: nextTitle,
-      messages: [
-        ...conv.messages,
-        { ...msg, id: userId } as Message,
-        { id: assistId, role: 'assistant', content: '' } as Message,
-      ],
-    }
-    const next = { ...conversations, [currentId]: nextConv }
-    // อัปเดต UI ทันที แล้วค่อยบันทึกแบบพื้นหลัง
-    setConversations(next)
-
-    void saveOnly(next)
-    logger.info('message', 'เพิ่มข้อความ', { conversationId: currentId, role: msg.role, tokens: (msg as any).tokens })
-    logger.debug('assistant', 'เริ่ม assistant message', { id: assistId, conversationId: currentId })
-    return assistId
-  }
-
-  const startAssistant = () => {
-    if (!currentId) return ''
-    const id = uuid()
-    const conv = conversations[currentId]
-    const nextConv = {
-      ...conv,
-      updatedAt: Date.now(),
-      messages: [...conv.messages, { id, role: 'assistant', content: '' } satisfies Message],
-    }
-    const next = { ...conversations, [currentId]: nextConv }
-    void save(next)
-    logger.debug('assistant', 'เริ่ม assistant message', { id, conversationId: currentId })
+    
+    dispatch({ type: 'CREATE_CONVERSATION', payload: conversation })
+    logger.info('chat', 'สร้างห้องสนทนาใหม่', { id })
     return id
-  }
+  }, [])
 
-  const appendAssistantDelta = (id: string, delta: string) => {
-    if (!currentId) return
-    const conv = conversations[currentId]
-    const nextMsgs: Message[] = conv.messages.map((m) =>
-      m.id === id ? { ...m, content: m.content + delta } : m
-    )
-    const next = {
-      ...conversations,
-      [currentId]: { ...conv, messages: nextMsgs, updatedAt: Date.now() },
+  const addMessage = useCallback((conversationId: string, role: 'user' | 'assistant', content: string) => {
+    const message: Message = {
+      id: crypto.randomUUID(),
+      role,
+      content,
+      createdAt: Date.now()
     }
-    setConversations(next) // update UI ทันที
-    logger.debug('assistant', 'สตรีม delta', { id, bytes: delta.length })
+    
+    dispatch({ type: 'ADD_MESSAGE', payload: { conversationId, message } })
+    logger.info('chat', 'เพิ่มข้อความ', { conversationId, role, content: content.slice(0, 50) })
+    return message.id
+  }, [])
+
+  const updateMessage = useCallback((conversationId: string, messageId: string, content: string) => {
+    dispatch({ type: 'UPDATE_MESSAGE', payload: { conversationId, messageId, content } })
+  }, [])
+
+  const setCurrentConversation = useCallback((id: string | null) => {
+    dispatch({ type: 'SET_CURRENT_CONVERSATION', payload: id })
+  }, [])
+
+  const setLoading = useCallback((loading: boolean) => {
+    dispatch({ type: 'SET_LOADING', payload: loading })
+  }, [])
+
+  const setError = useCallback((error: string | null) => {
+    dispatch({ type: 'SET_ERROR', payload: error })
+  }, [])
+
+  const deleteConversation = useCallback((id: string) => {
+    dispatch({ type: 'DELETE_CONVERSATION', payload: id })
+    logger.info('chat', 'ลบห้องสนทนา', { id })
+  }, [])
+
+  const actions = {
+    createConversation,
+    addMessage,
+    updateMessage,
+    setCurrentConversation,
+    setLoading,
+    setError,
+    deleteConversation
   }
 
-  const endAssistant = () => {
-    if (!currentId) return
-    const conv = conversations[currentId]
-    const next = {
-      ...conversations,
-      [currentId]: { ...conv, updatedAt: Date.now() },
-    }
-    // อัปเดต UI ทันที แล้วค่อยบันทึกแบบพื้นหลัง  
-    setConversations(next)
-
-    void saveOnly(next)
-    logger.info('assistant', 'จบ assistant message', { conversationId: currentId })
-  }
-
-  const replaceConversations = (nextConvs: Record<string, Conversation>) => {
-    const nextIds = Object.keys(nextConvs).sort(
-      (a, b) => nextConvs[b].updatedAt - nextConvs[a].updatedAt
-    )
-    const nextIdx = { ...index, sessionIds: nextIds }
-    setCurrentId(nextIdx.sessionIds[0] ?? null)
-    void save(nextConvs, nextIdx)
-  }
-
-  const value = useMemo(
-    () => ({
-      conversations,
-      currentId,
-      setCurrentId,
-      index,
-      addMessage,
-      addUserAndStartAssistant,
-      startAssistant,
-      appendAssistantDelta,
-      endAssistant,
-      newChat,
-      deleteChat,
-      deleteAll,
-      renameChat,
-      replaceConversations,
-    }),
-    [conversations, currentId, index]
+  return (
+    <ChatContext.Provider value={{ state, dispatch, actions }}>
+      {children}
+    </ChatContext.Provider>
   )
+}
 
-  return <ChatCtx.Provider value={value}>{children}</ChatCtx.Provider>
+// Hook
+export const useChat = () => {
+  const context = useContext(ChatContext)
+  if (!context) {
+    throw new Error('useChat must be used within a ChatProvider')
+  }
+  return context
 }
