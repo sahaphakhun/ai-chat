@@ -1,5 +1,3 @@
-import type { ModelName } from './constants/modelPricing'
-
 export type Role = 'system' | 'user' | 'assistant'
 
 export type Message = {

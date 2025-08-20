@@ -1,11 +1,11 @@
-import type { Message, Conversation } from '../types'
+import type { Conversation } from '../types'
 import { logger } from './logger'
 
 export type StreamOptions = {
   apiKey: string
   model: string
   systemPrompt?: string
-  messages: Message[]
+  messages: Array<{ role: string; content: string }>
   onChunk: (delta: string) => void
   onDone: () => void
   onError: (error: Error) => void
@@ -21,7 +21,7 @@ export class ChatService {
       stream: true,
       messages: [
         ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-        ...messages.map(m => ({ role: m.role, content: m.content }))
+        ...messages
       ]
     }
 

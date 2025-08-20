@@ -41,7 +41,7 @@ export const ChatWindow: React.FC = () => {
       actions.setError(null)
 
       // เพิ่มข้อความผู้ใช้
-      const userMessageId = actions.addMessage(currentConversation.id, 'user', text)
+      actions.addMessage(currentConversation.id, 'user', text)
 
       // สร้างข้อความ assistant ว่าง
       const assistantMessageId = actions.addMessage(currentConversation.id, 'assistant', '')

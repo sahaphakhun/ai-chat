@@ -14,6 +14,7 @@ type ChatAction =
   | { type: 'CREATE_CONVERSATION'; payload: Conversation }
   | { type: 'DELETE_CONVERSATION'; payload: string }
   | { type: 'LOAD_DATA'; payload: { conversations: Record<string, Conversation>; currentConversationId: string | null } }
+  | { type: 'IMPORT_CONVERSATIONS'; payload: Record<string, Conversation> }
 
 // Initial state
 const initialState: ChatState = {
@@ -110,6 +111,16 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       }
     }
     
+    case 'IMPORT_CONVERSATIONS': {
+      const conversations = action.payload
+      const firstId = Object.keys(conversations)[0] || null
+      return {
+        ...state,
+        conversations,
+        currentConversationId: firstId
+      }
+    }
+    
     default:
       return state
   }
@@ -127,6 +138,7 @@ const ChatContext = createContext<{
     setLoading: (loading: boolean) => void
     setError: (error: string | null) => void
     deleteConversation: (id: string) => void
+    importConversations: (conversations: Record<string, Conversation>) => void
   }
 } | null>(null)
 
@@ -217,6 +229,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logger.info('chat', 'ลบห้องสนทนา', { id })
   }, [])
 
+  const importConversations = useCallback((conversations: Record<string, Conversation>) => {
+    dispatch({ type: 'IMPORT_CONVERSATIONS', payload: conversations })
+    logger.info('chat', 'นำเข้าห้องสนทนา', { count: Object.keys(conversations).length })
+  }, [])
+
   const actions = {
     createConversation,
     addMessage,
@@ -224,7 +241,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentConversation,
     setLoading,
     setError,
-    deleteConversation
+    deleteConversation,
+    importConversations
   }
 
   return (

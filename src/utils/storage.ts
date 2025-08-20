@@ -78,4 +78,52 @@ export class StorageService {
       throw error
     }
   }
+
+  static exportAsJson(conversations: Record<string, Conversation>): void {
+    try {
+      const data = {
+        conversations,
+        exportDate: new Date().toISOString(),
+        version: '1.0'
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ai-chat-export-${new Date().toISOString().slice(0, 19)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      logger.info('storage', 'ส่งออกข้อมูลสำเร็จ')
+    } catch (error) {
+      logger.error('storage', 'ส่งออกข้อมูลล้มเหลว', { error: String(error) })
+      throw error
+    }
+  }
+
+  static async importFromJson(file: File): Promise<Record<string, Conversation>> {
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      const conversations = data.conversations || {}
+      
+      // ตรวจสอบความถูกต้องของข้อมูล
+      for (const [, conv] of Object.entries(conversations)) {
+        if (!conv || typeof conv !== 'object') {
+          throw new Error('ข้อมูลไม่ถูกต้อง')
+        }
+        const conversation = conv as Conversation
+        if (!conversation.id || !conversation.title || !Array.isArray(conversation.messages)) {
+          throw new Error('โครงสร้างข้อมูลไม่ถูกต้อง')
+        }
+      }
+      
+      logger.info('storage', 'นำเข้าข้อมูลสำเร็จ', { conversationsCount: Object.keys(conversations).length })
+      return conversations as Record<string, Conversation>
+    } catch (error) {
+      logger.error('storage', 'นำเข้าข้อมูลล้มเหลว', { error: String(error) })
+      throw error
+    }
+  }
 }

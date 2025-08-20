@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChatWindow } from './components/ChatWindow'
 import { SettingsDrawer } from './components/SettingsDrawer'
+import { Toolbar } from './components/Toolbar'
 import { useTheme } from './hooks/useTheme'
 import { useSettings } from './contexts/SettingsContext'
 
@@ -36,6 +37,9 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Toolbar */}
+      <Toolbar />
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
