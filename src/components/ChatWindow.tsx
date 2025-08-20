@@ -146,7 +146,14 @@ export const ChatWindow: React.FC = () => {
       <div className="p-2 bg-yellow-100 text-xs">
         Debug: messages count = {messages.length}, currentId = {currentId}, 
         conversations keys = {Object.keys(conversations).join(', ')},
-        conv exists = {!!conv}, conv messages = {conv?.messages?.length || 0}
+        conv exists = {!!conv}, conv messages = {conv?.messages?.length || 0},
+        loading = {loading.toString()}, 
+        conv messages preview = {conv?.messages?.map(m => `${m.role}:${m.content.slice(0, 20)}`).join(', ') || 'none'},
+        conv id = {conv?.id || 'none'}, conv title = {conv?.title || 'none'},
+        conversations count = {Object.keys(conversations).length},
+        conversations preview = {Object.entries(conversations).map(([id, conv]) => `${id}:${conv.messages.length}msgs`).join(', ')},
+        currentId in conversations = {currentId ? (currentId in conversations).toString() : 'no currentId'},
+        conversations[currentId] = {JSON.stringify(conversations[currentId!])}
       </div>
       <MessageList messages={messages} />
       
