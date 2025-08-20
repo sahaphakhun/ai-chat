@@ -8,7 +8,7 @@ export const LogPanel: React.FC<{ open: boolean; onClose: () => void }> = ({ ope
 
   useEffect(() => {
     const unsub = logger.subscribe((l) => setLogs(l.slice()))
-    return () => unsub()
+    return () => { unsub() }
   }, [])
 
   const filtered = useMemo(() => {

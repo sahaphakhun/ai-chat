@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid'
-
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export type LogEntry = {
@@ -38,7 +36,7 @@ function emit() {
 }
 
 function _log(level: LogLevel, type: string, msg: string, meta?: Record<string, unknown>) {
-  const entry: LogEntry = { id: uuidv4?.() || crypto.randomUUID(), ts: Date.now(), level, type, msg, meta }
+  const entry: LogEntry = { id: (globalThis as any).crypto?.randomUUID?.() || String(Math.random()).slice(2), ts: Date.now(), level, type, msg, meta }
   logs.push(entry)
   if (logs.length > MAX_LOGS) logs = logs.slice(-MAX_LOGS)
   persist()
