@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useChat } from '../contexts/ChatContext'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'

@@ -8,11 +8,6 @@ export const ModelSelect: React.FC = () => {
   const { settings, setSettings } = useSettings()
   const { push } = useToast()
   const [models, setModels] = useState<string[]>(MODEL_PRICING.map(m => m.name))
-  const groups = MODEL_PRICING.reduce<Record<string, string[]>>((acc, m) => {
-    acc[m.group] = acc[m.group] || []
-    acc[m.group].push(m.name)
-    return acc
-  }, {})
 
   const refresh = async () => {
     try {
@@ -40,11 +35,7 @@ export const ModelSelect: React.FC = () => {
       <div className="flex items-center gap-2">
         <select value={settings.model} onChange={e => setSettings(s => ({ ...s, model: e.target.value as any }))}
           className="border dark:border-neutral-700 rounded px-2 py-1 bg-white dark:bg-neutral-900">
-          {Object.entries(groups).map(([g, names]) => (
-            <optgroup label={g} key={g}>
-              {names.map(n => <option key={n} value={n}>{n}</option>)}
-            </optgroup>
-          ))}
+          {models.map(n => <option key={n} value={n}>{n}</option>)}
         </select>
         <button onClick={refresh} className="px-2 py-1 rounded bg-neutral-200 dark:bg-neutral-700">Refresh from API</button>
       </div>
