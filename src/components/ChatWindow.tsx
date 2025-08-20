@@ -7,6 +7,7 @@ import { streamChat } from '../utils/openai'
 import { useToast } from '../contexts/ToastContext'
 import { countTokensText, countTokensConversation } from '../utils/token'
 import { costUSD, formatUSD } from '../utils/cost'
+import { logger } from '../utils/logger'
 import type { Message } from '../types'
 
 export const ChatWindow: React.FC = () => {
@@ -25,8 +26,10 @@ export const ChatWindow: React.FC = () => {
   const onSend = async (text: string) => {
     if (!currentId) {
       push({ type: 'error', msg: 'กำลังโหลดห้องสนทนา โปรดลองอีกครั้ง' })
+      logger.warn('chat', 'พยายามส่งข้อความขณะยังไม่มีห้อง')
       return
     }
+    logger.info('message', 'ผู้ใช้ส่งข้อความ', { length: text.length })
     addMessage({ role: 'user', content: text, tokens: countTokensText(text) })
 
     setLoading(true)
@@ -45,18 +48,19 @@ export const ChatWindow: React.FC = () => {
       systemPrompt: settings.systemPrompt,
       messages: payloadMessages,
       onChunk: (d) => appendAssistantDelta(assistId, d),
-      onDone: () => { endAssistant(); setLoading(false) },
+      onDone: () => { endAssistant(); setLoading(false); logger.info('assistant', 'สตรีมเสร็จสิ้น') },
       onError: (e) => {
         const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
         push({ type: 'error', msg })
         endAssistant()
         setLoading(false)
+        logger.error('assistant', 'สตรีมผิดพลาด', { error: String(e) })
       },
       abortSignal: controller.signal
     })
   }
 
-  const stop = () => { abortRef.current?.abort(); setLoading(false) }
+  const stop = () => { abortRef.current?.abort(); setLoading(false); logger.warn('assistant', 'ผู้ใช้หยุดสตรีม') }
 
   // Empty state when no conversation
   if (!currentId || messages.length === 0) {
