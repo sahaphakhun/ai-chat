@@ -19,6 +19,10 @@ export const ChatWindow: React.FC = () => {
   const messages = conv?.messages ?? []
 
   const onSend = async (text: string) => {
+    if (!currentId) {
+      push({ type: 'error', msg: 'กำลังโหลดห้องสนทนา โปรดลองอีกครั้ง' })
+      return
+    }
     addMessage({ role: 'user', content: text, tokens: countTokensText(text) })
 
     setLoading(true)
@@ -57,7 +61,7 @@ export const ChatWindow: React.FC = () => {
         {loading ? <button onClick={stop} className="px-3 py-1 rounded bg-amber-600 text-white">หยุด</button> : null}
         <div className="text-xs text-neutral-500">โมเดล: {settings.model}</div>
       </div>
-      <MessageInput onSend={onSend} disabled={loading} />
+      <MessageInput onSend={onSend} disabled={loading || !currentId} />
     </div>
   )
 }
