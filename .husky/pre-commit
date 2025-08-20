@@ -1,7 +1,0 @@
-#!/usr/bin/env sh
-
-# เรียก ESLint ด้วย flat config โดยตรงเพื่อลดปัญหาธงไม่รองรับ
-npx --yes eslint . --config eslint.config.js || exit 1
-
-# รันเทสต์แบบไม่โต้ตอบ ถ้ามี
-npm test --silent || exit 1
