@@ -65,17 +65,6 @@ export const MessageInput: React.FC<{ onSend: (text: string) => void; disabled?:
             )}
           </button>
         </div>
-
-        {/* Quick Actions */}
-        <div className="flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
-          <div className="flex items-center space-x-4">
-            <span>💡 ใช้คำสั่งที่ชัดเจนเพื่อผลลัพธ์ที่ดี</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-xs">Enter</kbd>
-            <span>ส่ง</span>
-          </div>
-        </div>
       </div>
     </div>
   )

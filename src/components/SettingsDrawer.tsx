@@ -103,16 +103,6 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
                   )}
                 </button>
               </div>
-              
-              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <div className="flex items-start space-x-2">
-                  <span className="text-amber-600 dark:text-amber-400">⚠️</span>
-                  <div className="text-sm text-amber-800 dark:text-amber-300">
-                    <div className="font-medium">ข้อมูลความปลอดภัย:</div>
-                    <div>API Key จะถูกเก็บไว้ในอุปกรณ์ของคุณเท่านั้น (localStorage) และไม่ถูกส่งไปยังเซิร์ฟเวอร์อื่น หลีกเลี่ยงการใช้บนอุปกรณ์สาธารณะ</div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
