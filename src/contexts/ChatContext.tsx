@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
-import type { Conversation, Message, TokenUsage } from '../types'
+import type { Conversation, Message, OpenAIUsage } from '../types'
 import { loadAll, saveAll, type IndexRecord } from '../utils/storage'
 import { logger } from '../utils/logger'
 import { useSettings } from './SettingsContext'
@@ -35,8 +35,8 @@ type ChatAction =
   | { type: 'ADD_USER_MESSAGE'; payload: { conversationId: string; content: string; tokens: number } }
   | { type: 'START_ASSISTANT_MESSAGE'; payload: { conversationId: string; messageId: string } }
   | { type: 'APPEND_ASSISTANT_DELTA'; payload: { conversationId: string; messageId: string; delta: string } }
+  | { type: 'UPDATE_ASSISTANT_USAGE'; payload: { conversationId: string; messageId: string; usage: OpenAIUsage } }
   | { type: 'COMPLETE_ASSISTANT_MESSAGE'; payload: { conversationId: string } }
-  | { type: 'UPDATE_CONVERSATION_USAGE'; payload: { conversationId: string; usage: TokenUsage } }
   | { type: 'REPLACE_CONVERSATIONS'; payload: Record<string, Conversation> }
 
 // Initial state
@@ -205,13 +205,20 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       }
     }
     
-    case 'COMPLETE_ASSISTANT_MESSAGE': {
-      const { conversationId } = action.payload
+    case 'UPDATE_ASSISTANT_USAGE': {
+      const { conversationId, messageId, usage } = action.payload
       const conversation = state.conversations[conversationId]
       if (!conversation) return state
       
+      const updatedMessages = conversation.messages.map(msg =>
+        msg.id === messageId 
+          ? { ...msg, usage, tokens: usage.completion_tokens }
+          : msg
+      )
+      
       const updatedConversation: Conversation = {
         ...conversation,
+        messages: updatedMessages,
         updatedAt: Date.now()
       }
       
@@ -224,23 +231,13 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       }
     }
     
-    case 'UPDATE_CONVERSATION_USAGE': {
-      const { conversationId, usage } = action.payload
+    case 'COMPLETE_ASSISTANT_MESSAGE': {
+      const { conversationId } = action.payload
       const conversation = state.conversations[conversationId]
       if (!conversation) return state
       
-      // Accumulate usage data
-      const currentUsage = conversation.totalUsage
-      const newTotalUsage: TokenUsage = currentUsage ? {
-        prompt_tokens: currentUsage.prompt_tokens + usage.prompt_tokens,
-        completion_tokens: currentUsage.completion_tokens + usage.completion_tokens,
-        total_tokens: currentUsage.total_tokens + usage.total_tokens,
-        cached_tokens: (currentUsage.cached_tokens || 0) + (usage.cached_tokens || 0)
-      } : usage
-      
       const updatedConversation: Conversation = {
         ...conversation,
-        totalUsage: newTotalUsage,
         updatedAt: Date.now()
       }
       
@@ -285,6 +282,7 @@ type ChatCtxType = {
     addUserMessage: (content: string, tokens: number) => string
     startAssistantMessage: () => string
     appendAssistantDelta: (messageId: string, delta: string) => void
+    updateAssistantUsage: (messageId: string, usage: OpenAIUsage) => void
     completeAssistantMessage: () => void
     replaceConversations: (conversations: Record<string, Conversation>) => void
   }
@@ -459,6 +457,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logger.debug('assistant', 'สตรีม delta', { messageId, bytes: delta.length })
     }, [state.currentId]),
     
+    updateAssistantUsage: useCallback((messageId: string, usage: OpenAIUsage) => {
+      if (!state.currentId) return
+      
+      dispatch({ 
+        type: 'UPDATE_ASSISTANT_USAGE', 
+        payload: { conversationId: state.currentId, messageId, usage } 
+      })
+      logger.info('assistant', 'อัปเดต usage', { 
+        messageId, 
+        prompt_tokens: usage.prompt_tokens, 
+        completion_tokens: usage.completion_tokens,
+        total_tokens: usage.total_tokens
+      })
+    }, [state.currentId]),
+    
     completeAssistantMessage: useCallback(() => {
       if (!state.currentId) return
       
@@ -468,14 +481,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       logger.info('assistant', 'จบ assistant message', { conversationId: state.currentId })
     }, [state.currentId]),
-    
-    updateConversationUsage: useCallback((conversationId: string, usage: TokenUsage) => {
-      dispatch({ 
-        type: 'UPDATE_CONVERSATION_USAGE', 
-        payload: { conversationId, usage } 
-      })
-      logger.info('usage', 'อัปเดต usage data', { conversationId, usage })
-    }, []),
     
     replaceConversations: useCallback((conversations: Record<string, Conversation>) => {
       dispatch({ type: 'REPLACE_CONVERSATIONS', payload: conversations })

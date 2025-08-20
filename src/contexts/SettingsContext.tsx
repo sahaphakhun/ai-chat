@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { Settings } from '../types'
-import { MODEL_PRICING, PRICING_TIERS } from '../constants/modelPricing'
+import { MODEL_PRICING } from '../constants/modelPricing'
 
 const DEFAULT_API_KEY = (import.meta as any)?.env?.VITE_DEFAULT_API_KEY ?? ''
 
@@ -8,10 +8,8 @@ const defaultSettings: Settings = {
   apiKey: DEFAULT_API_KEY,
   systemPrompt: '',
   model: 'gpt-5',
-  pricingTier: 'standard',
   inPricePerK: MODEL_PRICING[0].inK,
   outPricePerK: MODEL_PRICING[0].outK,
-  cachedInPricePerK: PRICING_TIERS.standard['gpt-5']?.cachedInK,
   theme: 'light'
 }
 
@@ -30,26 +28,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // เริ่มจากค่าดีฟอลต์ แล้วให้ `ChatContext` โหลดค่าจากเซิร์ฟเวอร์มาซิงค์ภายหลัง
   const [settings, setSettings] = useState<Settings>({ ...defaultSettings, apiKey: DEFAULT_API_KEY || '' })
 
-  // When model or pricing tier changes, sync price from constants
+  // When model changes, sync price from constants
   useEffect(() => {
-    const tierPricing = PRICING_TIERS[settings.pricingTier]?.[settings.model as keyof typeof PRICING_TIERS[typeof settings.pricingTier]]
-    if (tierPricing) {
-      const needsUpdate = 
-        tierPricing.inK !== settings.inPricePerK || 
-        tierPricing.outK !== settings.outPricePerK ||
-        ('cachedInK' in tierPricing ? tierPricing.cachedInK : undefined) !== settings.cachedInPricePerK
-      
-      if (needsUpdate) {
-        setSettings(s => ({ 
-          ...s, 
-          inPricePerK: tierPricing.inK, 
-          outPricePerK: tierPricing.outK,
-          cachedInPricePerK: 'cachedInK' in tierPricing ? tierPricing.cachedInK : undefined
-        }))
-      }
+    const found = MODEL_PRICING.find(m => m.name === settings.model)
+    if (found && (found.inK !== settings.inPricePerK || found.outK !== settings.outPricePerK)) {
+      setSettings(s => ({ ...s, inPricePerK: found.inK, outPricePerK: found.outK }))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.model, settings.pricingTier])
+  }, [settings.model])
 
   const value = useMemo(() => ({ settings, setSettings }), [settings])
 

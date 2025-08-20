@@ -2,21 +2,31 @@ import type { ModelName } from './constants/modelPricing'
 
 export type Role = 'system' | 'user' | 'assistant'
 
-export type TokenUsage = {
+// OpenAI API usage data structure
+export type OpenAIUsage = {
   prompt_tokens: number
   completion_tokens: number
   total_tokens: number
-  cached_tokens?: number
+  prompt_tokens_details?: {
+    cached_tokens?: number
+    audio_tokens?: number
+  }
+  completion_tokens_details?: {
+    reasoning_tokens?: number
+    audio_tokens?: number
+    accepted_prediction_tokens?: number
+    rejected_prediction_tokens?: number
+  }
 }
 
 export type Message = { 
   id: string
   role: Role
   content: string
-  tokens?: number // Legacy estimated tokens
-  actualUsage?: TokenUsage // Actual usage from OpenAI API
+  tokens?: number
+  // เพิ่มข้อมูล usage จาก OpenAI API (สำหรับ assistant messages)
+  usage?: OpenAIUsage
 }
-
 export type Conversation = {
   id: string
   title: string
@@ -24,18 +34,13 @@ export type Conversation = {
   updatedAt: number
   messages: Message[]
   model: ModelName
-  totalUsage?: TokenUsage // Accumulated actual usage for the conversation
 }
-
-export type PricingTier = 'standard' | 'flex' | 'batch'
 
 export type Settings = {
   apiKey: string
   systemPrompt: string
   model: ModelName
-  pricingTier: PricingTier
   inPricePerK: number
   outPricePerK: number
-  cachedInPricePerK?: number
   theme: 'light' | 'dark'
 }

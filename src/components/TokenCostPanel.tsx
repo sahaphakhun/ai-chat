@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
 import { useChat } from '../contexts/ChatContext'
-import { countTokensConversation } from '../utils/token'
-import { costUSD, costFromUsage, formatUSD } from '../utils/cost'
-import type { PricingTier } from '../types'
+import { countTokensConversation, countTokensFromUsage } from '../utils/token'
+import { costUSD, formatUSD, calculateCostFromUsage } from '../utils/cost'
 
 export const TokenCostPanel: React.FC = () => {
   const { settings, setSettings } = useSettings()
@@ -11,83 +10,88 @@ export const TokenCostPanel: React.FC = () => {
   const { conversations, currentId, index } = state
   const conv = currentId ? conversations[currentId] : undefined
   const stats = useMemo(() => countTokensConversation(conv?.messages ?? []), [conv?.messages])
+  const apiStats = useMemo(() => countTokensFromUsage(conv?.messages ?? []), [conv?.messages])
 
-  // Calculate costs for current conversation
-  const inCost = costUSD(stats.input, settings.inPricePerK)
-  const outCost = costUSD(stats.output, settings.outPricePerK)
-  const currentTotal = inCost + outCost
+  // Calculate costs for current conversation using API data if available
+  const currentCosts = useMemo(() => {
+    if (!conv?.messages?.length) return { inputCost: 0, outputCost: 0, totalCost: 0, hasAPIData: false }
+    
+    // ถ้ามีข้อมูลจาก API ให้ใช้ข้อมูลนั้น
+    if (apiStats.hasCompleteAPIData) {
+      let totalInputCost = 0
+      let totalOutputCost = 0
+      
+      for (const message of conv.messages) {
+        if (message.role === 'assistant' && message.usage) {
+          const cost = calculateCostFromUsage(message.usage, settings.model)
+          totalInputCost += cost.inputCost
+          totalOutputCost += cost.outputCost
+        }
+      }
+      
+      return {
+        inputCost: totalInputCost,
+        outputCost: totalOutputCost,
+        totalCost: totalInputCost + totalOutputCost,
+        hasAPIData: true
+      }
+    } else {
+      // fallback ไปใช้การคำนวณแบบเดิม
+      const inCost = costUSD(stats.input, settings.inPricePerK)
+      const outCost = costUSD(stats.output, settings.outPricePerK)
+      return {
+        inputCost: inCost,
+        outputCost: outCost,
+        totalCost: inCost + outCost,
+        hasAPIData: false
+      }
+    }
+  }, [conv?.messages, apiStats.hasCompleteAPIData, settings.model, settings.inPricePerK, settings.outPricePerK, stats])
 
   // Calculate total costs across all conversations
   const allStats = useMemo(() => {
-    let totalInput = 0
-    let totalOutput = 0
-    let totalCached = 0
+    let totalInputCost = 0
+    let totalOutputCost = 0
     let totalConversations = 0
-    let actualUsageInput = 0
-    let actualUsageOutput = 0
-    let actualUsageCached = 0
-    let conversationsWithActualUsage = 0
+    let conversationsWithAPIData = 0
     
     index.sessionIds.forEach((id: string) => {
       const conversation = conversations[id]
       if (conversation?.messages?.length > 0) {
-        totalConversations++
+        const apiData = countTokensFromUsage(conversation.messages)
         
-        if (conversation.totalUsage) {
-          // Use actual usage data
-          actualUsageInput += conversation.totalUsage.prompt_tokens
-          actualUsageOutput += conversation.totalUsage.completion_tokens
-          actualUsageCached += conversation.totalUsage.cached_tokens || 0
-          conversationsWithActualUsage++
+        if (apiData.hasCompleteAPIData) {
+          // ใช้ข้อมูลจาก API
+          for (const message of conversation.messages) {
+            if (message.role === 'assistant' && message.usage) {
+              const cost = calculateCostFromUsage(message.usage, settings.model)
+              totalInputCost += cost.inputCost
+              totalOutputCost += cost.outputCost
+            }
+          }
+          conversationsWithAPIData++
         } else {
-          // Fall back to estimated usage
+          // fallback ไปใช้การคำนวณแบบเดิม
           const convStats = countTokensConversation(conversation.messages)
-          totalInput += convStats.input
-          totalOutput += convStats.output
+          totalInputCost += costUSD(convStats.input, settings.inPricePerK)
+          totalOutputCost += costUSD(convStats.output, settings.outPricePerK)
         }
+        totalConversations++
       }
     })
     
     return { 
-      totalInput, 
-      totalOutput, 
-      totalCached,
+      totalInputCost, 
+      totalOutputCost, 
       totalConversations,
-      actualUsageInput,
-      actualUsageOutput,
-      actualUsageCached,
-      conversationsWithActualUsage
+      conversationsWithAPIData
     }
-  }, [conversations, index.sessionIds])
+  }, [conversations, index.sessionIds, settings.model, settings.inPricePerK, settings.outPricePerK])
 
-  // Calculate costs combining actual and estimated usage
-  const actualInCost = costUSD(allStats.actualUsageInput, settings.inPricePerK)
-  const actualOutCost = costUSD(allStats.actualUsageOutput, settings.outPricePerK)
-  const actualCachedCost = settings.cachedInPricePerK ? costUSD(allStats.actualUsageCached, settings.cachedInPricePerK) : 0
-  const actualTotal = actualInCost + actualOutCost + actualCachedCost
-  
-  const estimatedInCost = costUSD(allStats.totalInput, settings.inPricePerK)
-  const estimatedOutCost = costUSD(allStats.totalOutput, settings.outPricePerK)
-  const estimatedTotal = estimatedInCost + estimatedOutCost
-  
-  const grandTotal = actualTotal + estimatedTotal
+  const grandTotal = allStats.totalInputCost + allStats.totalOutputCost
 
   return (
     <div className="space-y-6">
-      {/* Pricing Tier Selection */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Pricing Tier</label>
-        <select
-          value={settings.pricingTier}
-          onChange={e => setSettings(s => ({ ...s, pricingTier: e.target.value as PricingTier }))}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="standard">Standard (Real-time)</option>
-          <option value="flex">Flex (Lower cost, higher latency)</option>
-          <option value="batch">Batch (Lowest cost, async)</option>
-        </select>
-      </div>
-
       {/* Pricing Configuration */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -112,20 +116,6 @@ export const TokenCostPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Cached Input Pricing (if applicable) */}
-      {settings.cachedInPricePerK !== undefined && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">ราคา/1K tokens (Cached Input)</label>
-          <input 
-            type="number" 
-            step="0.001"
-            value={settings.cachedInPricePerK}
-            onChange={e => setSettings(s => ({ ...s, cachedInPricePerK: parseFloat(e.target.value) || 0 }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-      )}
-
       {/* Current Conversation Stats */}
       {currentId && conv && (
         <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -133,63 +123,39 @@ export const TokenCostPanel: React.FC = () => {
             <span className="mr-2">💬</span>
             ห้องสนทนาปัจจุบัน
           </h4>
-          
-          {/* Show actual usage if available */}
-          {conv.totalUsage ? (
-            <div className="space-y-3">
-              <div className="text-xs text-blue-700 dark:text-blue-400 font-medium">✅ Actual Usage (จาก OpenAI API)</div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-gray-600 dark:text-gray-400">Input Tokens</div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    {conv.totalUsage.prompt_tokens.toLocaleString()} = {formatUSD(costUSD(conv.totalUsage.prompt_tokens, settings.inPricePerK))}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-gray-600 dark:text-gray-400">Input Tokens</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {apiStats.hasCompleteAPIData ? apiStats.input.toLocaleString() : stats.input.toLocaleString()} = {formatUSD(currentCosts.inputCost)}
+                {apiStats.hasCompleteAPIData && apiStats.cached > 0 && (
+                  <div className="text-xs text-green-600 dark:text-green-400">
+                    (รวม cached: {apiStats.cached.toLocaleString()})
                   </div>
-                </div>
-                <div>
-                  <div className="text-gray-600 dark:text-gray-400">Output Tokens</div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    {conv.totalUsage.completion_tokens.toLocaleString()} = {formatUSD(costUSD(conv.totalUsage.completion_tokens, settings.outPricePerK))}
-                  </div>
-                </div>
-              </div>
-              {conv.totalUsage.cached_tokens && settings.cachedInPricePerK && (
-                <div className="text-sm">
-                  <div className="text-gray-600 dark:text-gray-400">Cached Input Tokens</div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    {conv.totalUsage.cached_tokens.toLocaleString()} = {formatUSD(costUSD(conv.totalUsage.cached_tokens, settings.cachedInPricePerK))}
-                  </div>
-                </div>
-              )}
-              <div className="pt-3 border-t border-blue-200 dark:border-blue-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">ค่าใช้จ่ายจริง:</span>
-                  <span className="font-bold text-blue-900 dark:text-blue-300">
-                    {formatUSD(costFromUsage(conv.totalUsage, settings.inPricePerK, settings.outPricePerK, settings.cachedInPricePerK))}
-                  </span>
-                </div>
+                )}
               </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="text-xs text-orange-700 dark:text-orange-400 font-medium">⚠️ Estimated Usage (คำนวณโดยประมาณ)</div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-gray-600 dark:text-gray-400">Input Tokens (ประมาณ)</div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">{stats.input.toLocaleString()} = {formatUSD(inCost)}</div>
-                </div>
-                <div>
-                  <div className="text-gray-600 dark:text-gray-400">Output Tokens (ประมาณ)</div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">{stats.output.toLocaleString()} = {formatUSD(outCost)}</div>
-                </div>
-              </div>
-              <div className="pt-3 border-t border-blue-200 dark:border-blue-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">ค่าใช้จ่ายประมาณ:</span>
-                  <span className="font-bold text-blue-900 dark:text-blue-300">{formatUSD(currentTotal)}</span>
-                </div>
+            <div>
+              <div className="text-gray-600 dark:text-gray-400">Output Tokens</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {apiStats.hasCompleteAPIData ? apiStats.output.toLocaleString() : stats.output.toLocaleString()} = {formatUSD(currentCosts.outputCost)}
               </div>
             </div>
-          )}
+          </div>
+          <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                ค่าใช้จ่ายห้องนี้:
+                {currentCosts.hasAPIData && (
+                  <span className="ml-1 text-xs text-green-600 dark:text-green-400">✓ API</span>
+                )}
+                {!currentCosts.hasAPIData && (
+                  <span className="ml-1 text-xs text-yellow-600 dark:text-yellow-400">~ ประมาณ</span>
+                )}
+              </span>
+              <span className="font-bold text-blue-900 dark:text-blue-300">{formatUSD(currentCosts.totalCost)}</span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -199,65 +165,27 @@ export const TokenCostPanel: React.FC = () => {
           <span className="mr-2">📊</span>
           สถิติรวมทั้งหมด
         </h4>
-        
-        {/* Actual Usage Stats */}
-        {allStats.conversationsWithActualUsage > 0 && (
-          <div className="mb-4">
-            <div className="text-xs text-green-700 dark:text-green-400 font-medium mb-2">
-              ✅ Actual Usage ({allStats.conversationsWithActualUsage} ห้อง)
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="text-gray-600 dark:text-gray-400">Input Tokens</div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">
-                  {allStats.actualUsageInput.toLocaleString()} = {formatUSD(actualInCost)}
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-600 dark:text-gray-400">Output Tokens</div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">
-                  {allStats.actualUsageOutput.toLocaleString()} = {formatUSD(actualOutCost)}
-                </div>
-              </div>
-            </div>
-            {allStats.actualUsageCached > 0 && settings.cachedInPricePerK && (
-              <div className="mt-2 text-sm">
-                <div className="text-gray-600 dark:text-gray-400">Cached Input Tokens</div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">
-                  {allStats.actualUsageCached.toLocaleString()} = {formatUSD(actualCachedCost)}
-                </div>
-              </div>
-            )}
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="text-gray-600 dark:text-gray-400">Total Input Cost</div>
+            <div className="font-medium text-gray-900 dark:text-gray-100">{formatUSD(allStats.totalInputCost)}</div>
           </div>
-        )}
-        
-        {/* Estimated Usage Stats */}
-        {allStats.totalConversations > allStats.conversationsWithActualUsage && (
-          <div className="mb-4">
-            <div className="text-xs text-orange-700 dark:text-orange-400 font-medium mb-2">
-              ⚠️ Estimated Usage ({allStats.totalConversations - allStats.conversationsWithActualUsage} ห้อง)
-            </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="text-gray-600 dark:text-gray-400">Input Tokens (ประมาณ)</div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">
-                  {allStats.totalInput.toLocaleString()} = {formatUSD(estimatedInCost)}
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-600 dark:text-gray-400">Output Tokens (ประมาณ)</div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">
-                  {allStats.totalOutput.toLocaleString()} = {formatUSD(estimatedOutCost)}
-                </div>
-              </div>
-            </div>
+          <div>
+            <div className="text-gray-600 dark:text-gray-400">Total Output Cost</div>
+            <div className="font-medium text-gray-900 dark:text-gray-100">{formatUSD(allStats.totalOutputCost)}</div>
           </div>
-        )}
-        
-        <div className="pt-3 border-t border-green-200 dark:border-green-700">
+        </div>
+        <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-700">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-gray-600 dark:text-gray-400">จำนวนห้องสนทนา:</span>
-            <span className="font-medium text-gray-900 dark:text-gray-100">{allStats.totalConversations} ห้อง</span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              {allStats.totalConversations} ห้อง
+              {allStats.conversationsWithAPIData > 0 && (
+                <span className="ml-1 text-xs text-green-600 dark:text-green-400">
+                  ({allStats.conversationsWithAPIData} ห้องมีข้อมูล API)
+                </span>
+              )}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600 dark:text-gray-400">ค่าใช้จ่ายรวมทั้งหมด:</span>
@@ -279,12 +207,15 @@ export const TokenCostPanel: React.FC = () => {
               <div className="font-medium text-gray-900 dark:text-gray-100">{formatUSD(grandTotal / allStats.totalConversations)}</div>
             </div>
             <div>
-              <div className="text-gray-600 dark:text-gray-400">เฉลี่ยต่อ Token</div>
+              <div className="text-gray-600 dark:text-gray-400">ความแม่นยำ</div>
               <div className="font-medium text-gray-900 dark:text-gray-100">
-                {allStats.totalInput + allStats.totalOutput > 0 
-                  ? formatUSD(grandTotal / (allStats.totalInput + allStats.totalOutput) * 1000) + '/1K'
-                  : '$0.000/1K'
-                }
+                {allStats.conversationsWithAPIData === allStats.totalConversations ? (
+                  <span className="text-green-600 dark:text-green-400">✓ ข้อมูลจาก API</span>
+                ) : allStats.conversationsWithAPIData > 0 ? (
+                  <span className="text-yellow-600 dark:text-yellow-400">~ บางส่วนจาก API</span>
+                ) : (
+                  <span className="text-orange-600 dark:text-orange-400">~ ประมาณการ</span>
+                )}
               </div>
             </div>
           </div>

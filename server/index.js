@@ -136,7 +136,15 @@ app.post('/api/chat/stream', async (req, res) => {
         try {
           const json = JSON.parse(data)
           const delta = json?.choices?.[0]?.delta?.content ?? ''
+          const usage = json?.usage // ดึงข้อมูล usage จาก OpenAI response
+          
+          // ส่ง delta content
           if (delta) res.write(`data: ${JSON.stringify({ delta })}\n\n`)
+          
+          // ส่งข้อมูล usage เมื่อได้รับ (มักจะมาในข้อความสุดท้าย)
+          if (usage) {
+            res.write(`data: ${JSON.stringify({ usage })}\n\n`)
+          }
         } catch {
           // ignore keepalive
         }

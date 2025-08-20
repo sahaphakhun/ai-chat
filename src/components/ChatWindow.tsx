@@ -8,7 +8,7 @@ import { useToast } from '../contexts/ToastContext'
 import { countTokensText, countTokensConversation } from '../utils/token'
 import { costUSD, formatUSD } from '../utils/cost'
 import { logger } from '../utils/logger'
-import type { Message, TokenUsage } from '../types'
+import type { Message } from '../types'
 
 export const ChatWindow: React.FC = () => {
   const { state, actions } = useChat()
@@ -75,17 +75,13 @@ export const ChatWindow: React.FC = () => {
         onChunk: (delta: string) => {
           actions.appendAssistantDelta(assistantMessageId, delta)
         },
-        onDone: (usage?: TokenUsage) => {
+        onUsage: (usage) => {
+          actions.updateAssistantUsage(assistantMessageId, usage)
+        },
+        onDone: () => {
           actions.completeAssistantMessage()
           actions.setLoading(false)
-          
-          if (usage) {
-            // Update conversation with actual usage data
-            ;(actions as any).updateConversationUsage(state.currentId!, usage)
-            logger.info('assistant', 'สตรีมเสร็จสิ้น พร้อม usage data', { usage })
-          } else {
-            logger.info('assistant', 'สตรีมเสร็จสิ้น (ไม่มี usage data)')
-          }
+          logger.info('assistant', 'สตรีมเสร็จสิ้น')
         },
         onError: (error: unknown) => {
           actions.setLoading(false)

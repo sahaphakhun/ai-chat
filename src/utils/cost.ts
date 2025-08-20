@@ -1,55 +1,57 @@
-import type { TokenUsage } from '../types'
+import type { OpenAIUsage } from '../types'
+import { MODEL_PRICING } from '../constants/modelPricing'
 
 export function costUSD(tokens: number, pricePerK: number): number {
   return (tokens / 1000) * pricePerK
-}
-
-export function costFromUsage(
-  usage: TokenUsage, 
-  inPricePerK: number, 
-  outPricePerK: number, 
-  cachedInPricePerK?: number
-): number {
-  const inputCost = costUSD(usage.prompt_tokens, inPricePerK)
-  const outputCost = costUSD(usage.completion_tokens, outPricePerK)
-  const cachedCost = usage.cached_tokens && cachedInPricePerK 
-    ? costUSD(usage.cached_tokens, cachedInPricePerK) 
-    : 0
-  
-  return inputCost + outputCost + cachedCost
 }
 
 export function formatUSD(n: number): string {
   return `$${n.toFixed(6)}`
 }
 
-export function formatUsageBreakdown(
-  usage: TokenUsage,
-  inPricePerK: number,
-  outPricePerK: number,
-  cachedInPricePerK?: number
-): {
+// คำนวณค่าใช้จ่ายจาก OpenAI usage data
+export function calculateCostFromUsage(usage: OpenAIUsage, modelName: string): {
   inputCost: number
   outputCost: number
-  cachedCost: number
   totalCost: number
-  breakdown: string
-} {
-  const inputCost = costUSD(usage.prompt_tokens, inPricePerK)
-  const outputCost = costUSD(usage.completion_tokens, outPricePerK)
-  const cachedCost = usage.cached_tokens && cachedInPricePerK 
-    ? costUSD(usage.cached_tokens, cachedInPricePerK) 
-    : 0
-  const totalCost = inputCost + outputCost + cachedCost
-  
-  let breakdown = `Input: ${usage.prompt_tokens.toLocaleString()} tokens = ${formatUSD(inputCost)}`
-  breakdown += `\nOutput: ${usage.completion_tokens.toLocaleString()} tokens = ${formatUSD(outputCost)}`
-  
-  if (usage.cached_tokens && cachedCost > 0) {
-    breakdown += `\nCached: ${usage.cached_tokens.toLocaleString()} tokens = ${formatUSD(cachedCost)}`
+  breakdown: {
+    regularInputTokens: number
+    cachedInputTokens: number
+    outputTokens: number
+    regularInputCost: number
+    cachedInputCost: number
+    outputCost: number
   }
-  
-  breakdown += `\nTotal: ${formatUSD(totalCost)}`
-  
-  return { inputCost, outputCost, cachedCost, totalCost, breakdown }
+} {
+  const modelPricing = MODEL_PRICING.find(m => m.name === modelName)
+  if (!modelPricing) {
+    // fallback ถ้าไม่เจอโมเดล ใช้ราคา gpt-4o-mini
+    console.warn(`Model ${modelName} not found in pricing table, using gpt-4o-mini pricing`)
+    return calculateCostFromUsage(usage, 'gpt-4o-mini')
+  }
+
+  const cachedTokens = usage.prompt_tokens_details?.cached_tokens ?? 0
+  const regularInputTokens = usage.prompt_tokens - cachedTokens
+  const outputTokens = usage.completion_tokens
+
+  const regularInputCost = costUSD(regularInputTokens, modelPricing.inK)
+  const cachedInputCost = modelPricing.cachedInK ? costUSD(cachedTokens, modelPricing.cachedInK) : 0
+  const outputCost = costUSD(outputTokens, modelPricing.outK)
+
+  const inputCost = regularInputCost + cachedInputCost
+  const totalCost = inputCost + outputCost
+
+  return {
+    inputCost,
+    outputCost,
+    totalCost,
+    breakdown: {
+      regularInputTokens,
+      cachedInputTokens: cachedTokens,
+      outputTokens,
+      regularInputCost,
+      cachedInputCost,
+      outputCost
+    }
+  }
 }
