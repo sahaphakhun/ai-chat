@@ -2,6 +2,7 @@ import React from 'react'
 import { useChat } from '../contexts/ChatContext'
 import { exportAsJson, importFromJson } from '../utils/storage'
 import { useToast } from '../contexts/ToastContext'
+import { logger } from '../utils/logger'
 
 export const Toolbar: React.FC<{ onOpenSessions: () => void }> = ({ onOpenSessions }) => {
   const { newChat, deleteAll, conversations, replaceConversations, currentId, deleteChat } = useChat()
@@ -9,11 +10,14 @@ export const Toolbar: React.FC<{ onOpenSessions: () => void }> = ({ onOpenSessio
 
   const onUpload = async (file: File) => {
     try {
+      logger.info('import', 'เริ่มนำเข้าข้อมูลจากไฟล์', { name: file.name, size: file.size })
       const convs = await importFromJson(file)
       replaceConversations(convs)
       push({ type: 'success', msg: 'อัปโหลดสำเร็จ' })
+      logger.info('import', 'นำเข้าข้อมูลสำเร็จ', { conversations: Object.keys(convs).length })
     } catch (e) {
       push({ type: 'error', msg: 'อัปโหลดล้มเหลว' })
+      logger.error('import', 'นำเข้าล้มเหลว', { error: String(e) })
     }
   }
 

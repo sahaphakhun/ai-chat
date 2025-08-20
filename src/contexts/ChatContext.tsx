@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { Conversation, Message } from '../types'
 import { loadAll, saveAll, type IndexRecord } from '../utils/storage'
+import { logger } from '../utils/logger'
 
 // ใช้ฟังก์ชัน uuid มาตรฐานของเบราว์เซอร์
 const uuid = () => crypto.randomUUID()
@@ -58,6 +59,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIndex(index0)
       setConversations(conversations0)
       setCurrentId(index0.sessionIds[0] ?? Object.keys(conversations0)[0] ?? null)
+      logger.info('app', 'โหลดข้อมูลเริ่มต้นเสร็จสิ้น', { sessions: index0.sessionIds.length })
     })()
   }, [])
 
@@ -75,6 +77,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nextIdx = { ...index, sessionIds: [conv.id, ...index.sessionIds] }
     setCurrentId(conv.id)
     void save(next, nextIdx)
+    logger.info('chat', 'สร้างห้องใหม่', { id: conv.id })
   }
 
   const deleteChat = (id: string) => {
@@ -85,6 +88,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nextCurrent = nextIds[0] ?? null
     setCurrentId(nextCurrent)
     void save(next, nextIdx)
+    logger.warn('chat', 'ลบห้อง', { id })
   }
 
   const deleteAll = () => {
@@ -93,6 +97,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const nextIdx = { ...index, sessionIds: [conv.id] }
     setCurrentId(conv.id)
     void save(next, nextIdx)
+    logger.warn('chat', 'ลบทั้งหมดและสร้างห้องใหม่', { keepId: conv.id })
   }
 
   const renameChat = (id: string, title: string) => {
@@ -103,6 +108,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       [id]: { ...conv, title, updatedAt: Date.now() },
     }
     void save(next)
+    logger.info('chat', 'เปลี่ยนชื่อห้อง', { id, title })
   }
 
   const addMessage = (msg: Omit<Message, 'id'>) => {
@@ -120,6 +126,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const next = { ...conversations, [currentId]: nextConv }
     void save(next)
+    logger.info('message', 'เพิ่มข้อความ', { conversationId: currentId, role: msg.role, tokens: (msg as any).tokens })
   }
 
   const startAssistant = () => {
@@ -133,6 +140,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const next = { ...conversations, [currentId]: nextConv }
     void save(next)
+    logger.debug('assistant', 'เริ่ม assistant message', { id, conversationId: currentId })
     return id
   }
 
@@ -147,6 +155,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       [currentId]: { ...conv, messages: nextMsgs, updatedAt: Date.now() },
     }
     setConversations(next) // update UI ทันที
+    logger.debug('assistant', 'สตรีม delta', { id, bytes: delta.length })
   }
 
   const endAssistant = () => {
@@ -157,6 +166,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       [currentId]: { ...conv, updatedAt: Date.now() },
     }
     void save(next)
+    logger.info('assistant', 'จบ assistant message', { conversationId: currentId })
   }
 
   const replaceConversations = (nextConvs: Record<string, Conversation>) => {

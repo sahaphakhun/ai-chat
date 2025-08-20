@@ -4,11 +4,13 @@ import { SessionList } from './components/SessionList'
 import { ChatWindow } from './components/ChatWindow'
 import { SettingsDrawer } from './components/SettingsDrawer'
 import { useTheme } from './hooks/useTheme'
+import { LogPanel } from './components/LogPanel'
 import { useSettings } from './contexts/SettingsContext'
 
 export default function App() {
   const [open, setOpen] = useState(false)
   const [openSessions, setOpenSessions] = useState(false)
+  const [openLogs, setOpenLogs] = useState(false)
   const { settings, setSettings } = useSettings()
   useTheme(settings.theme)
 
@@ -29,6 +31,13 @@ export default function App() {
               className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               {settings.theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+            <button
+              onClick={() => setOpenLogs(true)}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              title="เปิด Logs"
+            >
+              🧾
             </button>
             <button
               onClick={() => setOpen(true)}
@@ -75,6 +84,7 @@ export default function App() {
 
       {/* Settings Drawer */}
       <SettingsDrawer open={open} onClose={() => setOpen(false)} />
+      <LogPanel open={openLogs} onClose={() => setOpenLogs(false)} />
     </div>
   )
 }
