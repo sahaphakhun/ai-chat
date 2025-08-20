@@ -1,129 +1,122 @@
 import type { Conversation, Settings } from '../types'
 import { logger } from './logger'
 
-const STORAGE_KEY = 'ai-chat-data'
+const LOCAL_STORAGE_KEY = 'chatui:index'
+const DB_KEY = 'chatui:db'
+const MAX_LOCAL_BYTES = 5 * 1024 * 1024 // 5MB
 
-export type StorageData = {
-  conversations: Record<string, Conversation>
+export type IndexRecord = {
+  useDB: boolean
   settings: Settings
-  currentConversationId: string | null
+  sessionIds: string[]
 }
 
-export class StorageService {
-  static async load(): Promise<StorageData> {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const data = JSON.parse(stored) as StorageData
-        logger.info('storage', 'โหลดข้อมูลสำเร็จ', { 
-          conversationsCount: Object.keys(data.conversations || {}).length 
+function sizeOf(obj: unknown): number {
+  try {
+    return new Blob([JSON.stringify(obj)]).size
+  } catch {
+    return Infinity
+  }
+}
+
+export function loadIndex(): IndexRecord | null {
+  const raw = localStorage.getItem(LOCAL_STORAGE_KEY)
+  return raw ? (JSON.parse(raw) as IndexRecord) : null
+}
+
+function saveIndex(idx: IndexRecord) {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(idx))
+}
+
+export async function loadAll(): Promise<{ index: IndexRecord | null; conversations: Record<string, Conversation> }> {
+  // โหลดจากเซิร์ฟเวอร์เป็นหลัก
+  try {
+    const res = await fetch('/api/data')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const json = await res.json()
+    const serverIndex = (json?.index ?? null) as IndexRecord | null
+    const serverConvs = (json?.conversations ?? {}) as Record<string, Conversation>
+    logger.info('storage', 'loadAll: server', { hasIndex: !!serverIndex, conversations: Object.keys(serverConvs || {}).length })
+
+    if (serverIndex && Object.keys(serverConvs).length > 0) {
+      return { index: serverIndex, conversations: serverConvs }
+    }
+
+    // ถ้าเซิร์ฟเวอร์ยังว่าง ลอง seed จาก local (สำหรับการย้ายมาใช้ DATABASE_URL ครั้งแรก)
+    const localIndex = loadIndex()
+    const raw = localStorage.getItem(DB_KEY)
+    const localData = raw ? JSON.parse(raw) : { conversations: {} }
+    const localConvs = (localData?.conversations ?? {}) as Record<string, Conversation>
+    if (localIndex && Object.keys(localConvs).length > 0) {
+      logger.info('storage', 'loadAll: seed server from local', { sessions: localIndex.sessionIds.length, conversations: Object.keys(localConvs).length })
+      try {
+        const saveRes = await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ index: localIndex, conversations: localConvs })
         })
-        return data
+        if (!saveRes.ok) throw new Error(`HTTP ${saveRes.status}`)
+      } catch (se) {
+        logger.warn('storage', 'seed server failed', { error: String(se) })
       }
-    } catch (error) {
-      logger.error('storage', 'โหลดข้อมูลล้มเหลว', { error: String(error) })
+      return { index: localIndex, conversations: localConvs }
     }
 
-    // ค่าเริ่มต้น
-    return {
-      conversations: {},
-      settings: {
-        apiKey: '',
-        systemPrompt: '',
-        model: 'gpt-4o',
-        inPricePerK: 0.005,
-        outPricePerK: 0.015,
-        theme: 'light'
-      },
-      currentConversationId: null
-    }
+    return { index: serverIndex, conversations: serverConvs }
+  } catch (e) {
+    // fallback: อ่านจาก local (กรณี dev ไม่มีเซิร์ฟเวอร์)
+    logger.warn('storage', 'loadAll: server failed, fallback local', { error: String(e) })
+    const index = loadIndex()
+    if (!index) return { index: null, conversations: {} }
+    const raw = localStorage.getItem(DB_KEY)
+    const data = raw ? JSON.parse(raw) : { conversations: {} }
+    return { index, conversations: data.conversations || {} }
   }
+}
 
-  static async save(data: StorageData): Promise<void> {
+export async function saveAll(index: IndexRecord, conversations: Record<string, Conversation>) {
+  // บันทึกไปที่เซิร์ฟเวอร์เป็นหลัก
+  try {
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ index, conversations })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    logger.info('storage', 'saveAll: server ok', { sessions: index.sessionIds.length, conversations: Object.keys(conversations).length })
+  } catch (e) {
+    // fallback: เขียนลง local เพื่อไม่ให้ผู้ใช้เสียข้อมูล
+    logger.error('storage', 'saveAll: server failed, fallback local', { error: String(e) })
+    const payload = { conversations }
+    const totalSize = sizeOf(index) + sizeOf(payload)
+    const nextUseDB = totalSize > MAX_LOCAL_BYTES
+    index.useDB = nextUseDB
+    saveIndex(index)
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-      logger.info('storage', 'บันทึกข้อมูลสำเร็จ', { 
-        conversationsCount: Object.keys(data.conversations).length 
-      })
-    } catch (error) {
-      logger.error('storage', 'บันทึกข้อมูลล้มเหลว', { error: String(error) })
-      throw error
-    }
-  }
-
-  static async saveConversations(conversations: Record<string, Conversation>): Promise<void> {
-    const data = await this.load()
-    data.conversations = conversations
-    await this.save(data)
-  }
-
-  static async saveSettings(settings: Settings): Promise<void> {
-    const data = await this.load()
-    data.settings = settings
-    await this.save(data)
-  }
-
-  static async saveCurrentConversationId(id: string | null): Promise<void> {
-    const data = await this.load()
-    data.currentConversationId = id
-    await this.save(data)
-  }
-
-  static async clear(): Promise<void> {
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-      logger.info('storage', 'ล้างข้อมูลสำเร็จ')
-    } catch (error) {
-      logger.error('storage', 'ล้างข้อมูลล้มเหลว', { error: String(error) })
-      throw error
-    }
-  }
-
-  static exportAsJson(conversations: Record<string, Conversation>): void {
-    try {
-      const data = {
-        conversations,
-        exportDate: new Date().toISOString(),
-        version: '1.0'
+      if (nextUseDB) {
+        localStorage.setItem(DB_KEY, JSON.stringify({ _hint: 'see IndexedDB' }))
+      } else {
+        localStorage.setItem(DB_KEY, JSON.stringify(payload))
       }
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ai-chat-export-${new Date().toISOString().slice(0, 19)}.json`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      logger.info('storage', 'ส่งออกข้อมูลสำเร็จ')
-    } catch (error) {
-      logger.error('storage', 'ส่งออกข้อมูลล้มเหลว', { error: String(error) })
-      throw error
-    }
+    } catch {}
   }
+}
 
-  static async importFromJson(file: File): Promise<Record<string, Conversation>> {
-    try {
-      const text = await file.text()
-      const data = JSON.parse(text)
-      const conversations = data.conversations || {}
-      
-      // ตรวจสอบความถูกต้องของข้อมูล
-      for (const [, conv] of Object.entries(conversations)) {
-        if (!conv || typeof conv !== 'object') {
-          throw new Error('ข้อมูลไม่ถูกต้อง')
-        }
-        const conversation = conv as Conversation
-        if (!conversation.id || !conversation.title || !Array.isArray(conversation.messages)) {
-          throw new Error('โครงสร้างข้อมูลไม่ถูกต้อง')
-        }
-      }
-      
-      logger.info('storage', 'นำเข้าข้อมูลสำเร็จ', { conversationsCount: Object.keys(conversations).length })
-      return conversations as Record<string, Conversation>
-    } catch (error) {
-      logger.error('storage', 'นำเข้าข้อมูลล้มเหลว', { error: String(error) })
-      throw error
-    }
-  }
+export function exportAsJson(conversations: Record<string, Conversation>) {
+  const blob = new Blob([JSON.stringify({ conversations }, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `chatui-export-${new Date().toISOString().slice(0,19)}.json`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+export async function importFromJson(file: File) {
+  const txt = await file.text()
+  const parsed = JSON.parse(txt)
+  const conversations = (parsed?.conversations ?? {}) as Record<string, Conversation>
+  return conversations
 }

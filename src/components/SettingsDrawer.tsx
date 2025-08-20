@@ -1,6 +1,9 @@
 import React, { useState } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
+import { ModelSelect } from './ModelSelect'
+import { TokenCostPanel } from './TokenCostPanel'
 import { useToast } from '../contexts/ToastContext'
+import { listModels } from '../utils/openai'
 import { logger } from '../utils/logger'
 
 export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
@@ -15,16 +18,7 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
     
     setTesting(true)
     try {
-      const response = await fetch('https://api.openai.com/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${key}`
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
+      await listModels(key)
       push({ type: 'success', msg: '✅ คีย์ใช้งานได้' })
       logger.info('settings', 'ทดสอบ API Key สำเร็จ')
     } catch (e) {
@@ -35,13 +29,6 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
       setTesting(false)
     }
   }
-
-  const models = [
-    { name: 'gpt-4o', label: 'GPT-4o (เร็วที่สุด)' },
-    { name: 'gpt-4o-mini', label: 'GPT-4o Mini (ประหยัด)' },
-    { name: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { name: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }
-  ]
 
   return (
     <>
@@ -144,54 +131,16 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
               <span className="text-lg">🤖</span>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">โมเดล AI</h3>
             </div>
-            
-            <select
-              value={settings.model}
-              onChange={e => setSettings(s => ({ ...s, model: e.target.value }))}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {models.map(model => (
-                <option key={model.name} value={model.name}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
+            <ModelSelect />
           </div>
 
-          {/* Price Settings */}
+          {/* Token Cost Panel */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <span className="text-lg">💰</span>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ราคา (ต่อ 1K tokens)</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ข้อมูลการใช้งาน</h3>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Input Price ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.001"
-                  value={settings.inPricePerK}
-                  onChange={e => setSettings(s => ({ ...s, inPricePerK: parseFloat(e.target.value) || 0 }))}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Output Price ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.001"
-                  value={settings.outPricePerK}
-                  onChange={e => setSettings(s => ({ ...s, outPricePerK: parseFloat(e.target.value) || 0 }))}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
+            <TokenCostPanel />
           </div>
         </div>
       </div>

@@ -1,63 +1,43 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { Settings } from '../types'
-import { StorageService } from '../utils/storage'
-import { logger } from '../utils/logger'
+import { MODEL_PRICING } from '../constants/modelPricing'
+
+const DEFAULT_API_KEY = (import.meta as any)?.env?.VITE_DEFAULT_API_KEY ?? ''
 
 const defaultSettings: Settings = {
-  apiKey: '',
+  apiKey: DEFAULT_API_KEY,
   systemPrompt: '',
-  model: 'gpt-4o',
-  inPricePerK: 0.005,
-  outPricePerK: 0.015,
+  model: 'gpt-5',
+  inPricePerK: MODEL_PRICING[0].inK,
+  outPricePerK: MODEL_PRICING[0].outK,
   theme: 'light'
 }
 
-const SettingsContext = createContext<{
+const SettingsCtx = createContext<{
   settings: Settings
   setSettings: React.Dispatch<React.SetStateAction<Settings>>
 } | null>(null)
 
-export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<Settings>(defaultSettings)
-
-  // โหลด settings เมื่อเริ่มต้น
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const data = await StorageService.load()
-        setSettings(data.settings)
-        logger.info('settings', 'โหลดการตั้งค่าสำเร็จ')
-      } catch (error) {
-        logger.error('settings', 'โหลดการตั้งค่าล้มเหลว', { error: String(error) })
-      }
-    }
-    loadSettings()
-  }, [])
-
-  // บันทึก settings เมื่อมีการเปลี่ยนแปลง
-  useEffect(() => {
-    const saveSettings = async () => {
-      try {
-        await StorageService.saveSettings(settings)
-        logger.info('settings', 'บันทึกการตั้งค่าสำเร็จ')
-      } catch (error) {
-        logger.error('settings', 'บันทึกการตั้งค่าล้มเหลว', { error: String(error) })
-      }
-    }
-    saveSettings()
-  }, [settings])
-
-  return (
-    <SettingsContext.Provider value={{ settings, setSettings }}>
-      {children}
-    </SettingsContext.Provider>
-  )
+export function useSettings() {
+  const ctx = useContext(SettingsCtx)
+  if (!ctx) throw new Error('SettingsCtx missing')
+  return ctx
 }
 
-export const useSettings = () => {
-  const context = useContext(SettingsContext)
-  if (!context) {
-    throw new Error('useSettings must be used within a SettingsProvider')
-  }
-  return context
+export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // เริ่มจากค่าดีฟอลต์ แล้วให้ `ChatContext` โหลดค่าจากเซิร์ฟเวอร์มาซิงค์ภายหลัง
+  const [settings, setSettings] = useState<Settings>({ ...defaultSettings, apiKey: DEFAULT_API_KEY || '' })
+
+  // When model changes, sync price from constants
+  useEffect(() => {
+    const found = MODEL_PRICING.find(m => m.name === settings.model)
+    if (found && (found.inK !== settings.inPricePerK || found.outK !== settings.outPricePerK)) {
+      setSettings(s => ({ ...s, inPricePerK: found.inK, outPricePerK: found.outK }))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.model])
+
+  const value = useMemo(() => ({ settings, setSettings }), [settings])
+
+  return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>
 }

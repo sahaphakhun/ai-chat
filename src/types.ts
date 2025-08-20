@@ -1,34 +1,21 @@
+import type { ModelName } from './constants/modelPricing'
+
 export type Role = 'system' | 'user' | 'assistant'
-
-export type Message = {
-  id: string
-  role: Role
-  content: string
-  tokens?: number
-  createdAt: number
-}
-
+export type Message = { id: string; role: Role; content: string; tokens?: number }
 export type Conversation = {
   id: string
   title: string
-  messages: Message[]
-  model: string
   createdAt: number
   updatedAt: number
+  messages: Message[]
+  model: ModelName
 }
 
 export type Settings = {
   apiKey: string
   systemPrompt: string
-  model: string
+  model: ModelName
   inPricePerK: number
   outPricePerK: number
   theme: 'light' | 'dark'
-}
-
-export type ChatState = {
-  conversations: Record<string, Conversation>
-  currentConversationId: string | null
-  isLoading: boolean
-  error: string | null
 }

@@ -1,32 +1,38 @@
-import React, { useRef, useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useChat } from '../contexts/ChatContext'
-import { useSettings } from '../contexts/SettingsContext'
-import { useToast } from '../contexts/ToastContext'
-import { ChatService } from '../utils/chatService'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { useSettings } from '../contexts/SettingsContext'
+import { streamChat } from '../utils/openai'
+import { useToast } from '../contexts/ToastContext'
+import { countTokensText, countTokensConversation } from '../utils/token'
+import { costUSD, formatUSD } from '../utils/cost'
 import { logger } from '../utils/logger'
+import type { Message } from '../types'
 
 export const ChatWindow: React.FC = () => {
   const { state, actions } = useChat()
   const { settings } = useSettings()
   const { push } = useToast()
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  // สร้างห้องสนทนาใหม่ถ้ายังไม่มี
+  // สร้างห้องใหม่อัตโนมัติ ถ้ายังไม่มี currentId
   useEffect(() => {
-    if (!state.currentConversationId && Object.keys(state.conversations).length === 0) {
+    if (!state.currentId && Object.keys(state.conversations).length === 0) {
       actions.createConversation()
     }
-  }, [state.currentConversationId, state.conversations, actions])
+  }, [state.currentId, state.conversations, actions])
 
-  const currentConversation = state.currentConversationId 
-    ? state.conversations[state.currentConversationId] 
-    : null
+  const currentConversation = state.currentId ? state.conversations[state.currentId] : null
+  const messages = currentConversation?.messages ?? []
+  const stats = countTokensConversation(messages)
+  const inCost = costUSD(stats.input, settings.inPricePerK)
+  const outCost = costUSD(stats.output, settings.outPricePerK)
 
   const handleSendMessage = async (text: string) => {
-    if (!currentConversation) {
-      push({ type: 'error', msg: 'ไม่พบห้องสนทนา' })
+    if (!state.currentId) {
+      push({ type: 'error', msg: 'กำลังโหลดห้องสนทนา โปรดลองอีกครั้ง' })
+      logger.warn('chat', 'พยายามส่งข้อความขณะยังไม่มีห้อง')
       return
     }
 
@@ -41,40 +47,48 @@ export const ChatWindow: React.FC = () => {
       actions.setError(null)
 
       // เพิ่มข้อความผู้ใช้
-      actions.addMessage(currentConversation.id, 'user', text)
+      const userMessageId = actions.addUserMessage(text, countTokensText(text))
 
       // สร้างข้อความ assistant ว่าง
-      const assistantMessageId = actions.addMessage(currentConversation.id, 'assistant', '')
+      const assistantMessageId = actions.startAssistantMessage()
 
       // สร้าง AbortController สำหรับยกเลิกการสตรีม
-      abortControllerRef.current = new AbortController()
+      abortRef.current = new AbortController()
+
+      // เตรียมข้อความสำหรับส่งไป API
+      const payloadMessages: Message[] = [
+        ...messages,
+        { id: 'temp-user', role: 'user', content: text } as Message
+      ]
+
+      logger.info('message', 'ผู้ใช้ส่งข้อความ', { 
+        length: text.length, 
+        preview: text.slice(0, 80) 
+      })
 
       // เริ่มสตรีม
-      await ChatService.sendMessage(
-        currentConversation,
-        text,
-        settings.apiKey,
-        settings.model,
-        settings.systemPrompt,
-        // onChunk - อัปเดตข้อความ assistant แบบเรียลไทม์
-        (delta: string) => {
-          const currentContent = currentConversation.messages.find(m => m.id === assistantMessageId)?.content || ''
-          actions.updateMessage(currentConversation.id, assistantMessageId, currentContent + delta)
+      await streamChat({
+        apiKey: settings.apiKey.trim(),
+        model: settings.model,
+        systemPrompt: settings.systemPrompt,
+        messages: payloadMessages,
+        onChunk: (delta: string) => {
+          actions.appendAssistantDelta(assistantMessageId, delta)
         },
-        // onDone - จบการสตรีม
-        () => {
+        onDone: () => {
+          actions.completeAssistantMessage()
           actions.setLoading(false)
-          logger.info('chat', 'การสนทนาสำเร็จ')
+          logger.info('assistant', 'สตรีมเสร็จสิ้น')
         },
-        // onError - จัดการข้อผิดพลาด
-        (error: Error) => {
+        onError: (error: unknown) => {
           actions.setLoading(false)
-          actions.setError(error.message)
-          push({ type: 'error', msg: error.message })
-          logger.error('chat', 'การสนทนาล้มเหลว', { error: error.message })
+          const errorMessage = error instanceof Error ? error.message : 'สตรีมล้มเหลว'
+          actions.setError(errorMessage)
+          push({ type: 'error', msg: errorMessage })
+          logger.error('assistant', 'สตรีมผิดพลาด', { error: String(error) })
         },
-        abortControllerRef.current.signal
-      )
+        abortSignal: abortRef.current.signal
+      })
 
     } catch (error) {
       actions.setLoading(false)
@@ -86,8 +100,8 @@ export const ChatWindow: React.FC = () => {
   }
 
   const handleStop = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
+    if (abortRef.current) {
+      abortRef.current.abort()
       actions.setLoading(false)
       logger.info('chat', 'ผู้ใช้หยุดการสตรีม')
     }
@@ -103,7 +117,7 @@ export const ChatWindow: React.FC = () => {
               <span className="text-3xl text-white">🤖</span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              ยินดีต้อนรับสู่ AI Chat
+              ยินดีต้อนรับสู่ AI Chat Tester
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               เริ่มต้นการสนทนากับ AI โดยพิมพ์ข้อความด้านล่าง
@@ -117,35 +131,8 @@ export const ChatWindow: React.FC = () => {
 
   return (
     <div className="flex flex-col flex-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-      {/* Header */}
-      <div className="px-4 py-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {currentConversation.title}
-            </h1>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {currentConversation.messages.length} ข้อความ
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {settings.model}
-            </span>
-            {state.isLoading && (
-              <button
-                onClick={handleStop}
-                className="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-              >
-                หยุด
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Messages */}
-      <MessageList messages={currentConversation.messages} />
+      <MessageList messages={messages} />
 
       {/* Error Display */}
       {state.error && (
@@ -156,6 +143,47 @@ export const ChatWindow: React.FC = () => {
         </div>
       )}
 
+      {/* Status Bar */}
+      <div className="px-4 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              <span>โมเดล: {settings.model}</span>
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              ข้อความ: {messages.length}
+            </div>
+          </div>
+          
+          {state.isLoading && (
+            <button 
+              onClick={handleStop} 
+              className="flex items-center space-x-2 px-3 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors shadow-sm"
+            >
+              <span>⏹️</span>
+              <span>หยุด</span>
+            </button>
+          )}
+        </div>
+        
+        {/* Cost Information */}
+        {messages.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
+                <span>💰 Total: {(stats.input + stats.output).toLocaleString()}</span>
+                <span>📊 Input: {stats.input.toLocaleString()}</span>
+                <span>📤 Output: {stats.output.toLocaleString()}</span>
+              </div>
+              <div className="font-medium text-gray-700 dark:text-gray-300">
+                ค่าใช้จ่าย: <span className="text-green-600 dark:text-green-400">{formatUSD(inCost + outCost)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
       {/* Input */}
       <MessageInput onSend={handleSendMessage} disabled={state.isLoading} />
     </div>

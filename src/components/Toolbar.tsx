@@ -1,55 +1,24 @@
 import React from 'react'
 import { useChat } from '../contexts/ChatContext'
-import { StorageService } from '../utils/storage'
+import { exportAsJson, importFromJson } from '../utils/storage'
 import { useToast } from '../contexts/ToastContext'
 import { logger } from '../utils/logger'
 
-export const Toolbar: React.FC = () => {
+export const Toolbar: React.FC<{ onOpenSessions: () => void }> = ({ onOpenSessions }) => {
   const { state, actions } = useChat()
+  const { conversations, currentId } = state
   const { push } = useToast()
 
-  const handleNewChat = () => {
-    actions.createConversation()
-    logger.info('toolbar', 'สร้างห้องสนทนาใหม่')
-  }
-
-  const handleDeleteCurrent = () => {
-    if (state.currentConversationId) {
-      actions.deleteConversation(state.currentConversationId)
-      logger.info('toolbar', 'ลบห้องสนทนาปัจจุบัน', { id: state.currentConversationId })
-    }
-  }
-
-  const handleDeleteAll = () => {
-    // ลบทุกห้องสนทนา
-    Object.keys(state.conversations).forEach(id => {
-      actions.deleteConversation(id)
-    })
-    logger.info('toolbar', 'ลบห้องสนทนาทั้งหมด')
-    push({ type: 'success', msg: 'ลบห้องสนทนาทั้งหมดแล้ว' })
-  }
-
-  const handleExport = () => {
+  const onUpload = async (file: File) => {
     try {
-      StorageService.exportAsJson(state.conversations)
-      push({ type: 'success', msg: 'ส่งออกข้อมูลสำเร็จ' })
-    } catch (error) {
-      logger.error('toolbar', 'ส่งออกข้อมูลล้มเหลว', { error: String(error) })
-      push({ type: 'error', msg: 'ส่งออกข้อมูลล้มเหลว' })
-    }
-  }
-
-  const handleImport = async (file: File) => {
-    try {
-      const conversations = await StorageService.importFromJson(file)
-      
-      // นำเข้าข้อมูลใหม่
-      actions.importConversations(conversations)
-      
-      push({ type: 'success', msg: 'นำเข้าข้อมูลสำเร็จ' })
-    } catch (error) {
-      logger.error('toolbar', 'นำเข้าข้อมูลล้มเหลว', { error: String(error) })
-      push({ type: 'error', msg: 'นำเข้าข้อมูลล้มเหลว' })
+      logger.info('import', 'เริ่มนำเข้าข้อมูลจากไฟล์', { name: file.name, size: file.size })
+      const convs = await importFromJson(file)
+      actions.replaceConversations(convs)
+      push({ type: 'success', msg: 'อัปโหลดสำเร็จ' })
+      logger.info('import', 'นำเข้าข้อมูลสำเร็จ', { conversations: Object.keys(convs).length })
+    } catch (e) {
+      push({ type: 'error', msg: 'อัปโหลดล้มเหลว' })
+      logger.error('import', 'นำเข้าล้มเหลว', { error: String(e) })
     }
   }
 
@@ -58,16 +27,24 @@ export const Toolbar: React.FC = () => {
       {/* Left Section */}
       <div className="flex items-center space-x-3">
         <button 
-          onClick={handleNewChat}
+          onClick={onOpenSessions} 
+          className="lg:hidden p-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors shadow-sm"
+          title="เปิดรายการห้องสนทนา"
+        >
+          💬
+        </button>
+
+        <button 
+          onClick={() => actions.createConversation()}
           className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium transition-all shadow-sm"
         >
           <span>➕</span>
           <span className="hidden sm:inline">ห้องใหม่</span>
         </button>
 
-        {state.currentConversationId && (
+        {currentId && (
           <button 
-            onClick={handleDeleteCurrent} 
+            onClick={() => actions.deleteConversation(currentId)} 
             className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors shadow-sm"
             title="ลบห้องสนทนานี้"
           >
@@ -81,7 +58,7 @@ export const Toolbar: React.FC = () => {
       <div className="flex items-center space-x-2">
         <div className="hidden md:flex items-center space-x-2">
           <button 
-            onClick={handleExport} 
+            onClick={() => exportAsJson(conversations)} 
             className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             title="ดาวน์โหลดข้อมูล"
           >
@@ -93,11 +70,11 @@ export const Toolbar: React.FC = () => {
             <span>📁</span>
             <span className="hidden lg:inline">อัปโหลด</span>
             <input type="file" accept="application/json" className="hidden"
-              onChange={e => e.target.files && handleImport(e.target.files[0])} />
+              onChange={e => e.target.files && onUpload(e.target.files[0])} />
           </label>
 
           <button 
-            onClick={handleDeleteAll} 
+            onClick={() => actions.deleteAllConversations()} 
             className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors shadow-sm"
             title="ลบทั้งหมด"
           >
@@ -111,8 +88,8 @@ export const Toolbar: React.FC = () => {
           <select 
             onChange={(e) => {
               const action = e.target.value
-              if (action === 'export') handleExport()
-              else if (action === 'deleteAll') handleDeleteAll()
+              if (action === 'export') exportAsJson(conversations)
+              else if (action === 'deleteAll') actions.deleteAllConversations()
               e.target.value = ''
             }}
             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 border-0"
