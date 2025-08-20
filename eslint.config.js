@@ -24,7 +24,8 @@ export default [
     rules: {
       'react/react-in-jsx-scope': 'off',
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      // ปิดเตือน dependencies ของ useEffect/useMemo/useCallback ตามความตั้งใจของโปรเจ็กต์นี้
+      'react-hooks/exhaustive-deps': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
     },
     settings: {
