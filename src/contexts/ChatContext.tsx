@@ -51,10 +51,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { index: idx, conversations: convs } = await loadAll()
       let index0 = idx
       let conversations0 = convs
-      if (!index0) {
+      // บูตสแตรป: หากไม่มี index หรือไม่มี sessionIds หรือไม่มีข้อมูลห้อง ให้สร้างห้องใหม่
+      if (!index0 || (index0.sessionIds?.length ?? 0) === 0 || Object.keys(conversations0 || {}).length === 0) {
         const conv = newConversation()
-        index0 = { useDB: false, settings: ({} as any), sessionIds: [conv.id] }
+        index0 = { useDB: index0?.useDB ?? false, settings: (index0?.settings as any) ?? ({} as any), sessionIds: [conv.id] }
         conversations0 = { [conv.id]: conv }
+      }
+      // ทำความสะอาด sessionIds ที่ไม่ตรงกับห้องจริง
+      const validIds = (index0.sessionIds || []).filter(id => !!conversations0[id])
+      if (validIds.length !== index0.sessionIds.length) {
+        index0 = { ...index0, sessionIds: (validIds.length ? validIds : Object.keys(conversations0)) }
       }
       setIndex(index0)
       setConversations(conversations0)
@@ -66,9 +72,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ฟังก์ชันบันทึก
   const save = async (nextConv: Record<string, Conversation>, nextIdx?: IndexRecord) => {
     const idx = nextIdx ?? index
-    await saveAll(idx, nextConv)
+    // อัปเดต UI ทันที จากนั้นค่อยบันทึกแบบพื้นหลัง
     setConversations(nextConv)
     if (nextIdx) setIndex(nextIdx)
+    try {
+      await saveAll(idx, nextConv)
+    } catch (e) {
+      logger.error('storage', 'บันทึกข้อมูลล้มเหลว', { error: String(e) })
+    }
   }
 
   const newChat = () => {
