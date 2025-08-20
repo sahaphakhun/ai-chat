@@ -153,7 +153,8 @@ export const ChatWindow: React.FC = () => {
         conversations count = {Object.keys(conversations).length},
         conversations preview = {Object.entries(conversations).map(([id, conv]) => `${id}:${conv.messages.length}msgs`).join(', ')},
         currentId in conversations = {currentId ? (currentId in conversations).toString() : 'no currentId'},
-        conversations[currentId] = {JSON.stringify(conversations[currentId!])}
+        conversations[currentId] = {currentId ? JSON.stringify(conversations[currentId]) : 'no currentId'},
+        conversations = {JSON.stringify(conversations)}
       </div>
       <MessageList messages={messages} />
       
