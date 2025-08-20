@@ -4,8 +4,8 @@ import { useChat } from '../contexts/ChatContext'
 export const SessionList: React.FC<{ className?: string; onSelect?: () => void }> = ({ className, onSelect }) => {
   const { index, conversations, currentId, setCurrentId } = useChat()
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
@@ -85,7 +85,7 @@ export const SessionList: React.FC<{ className?: string; onSelect?: () => void }
                         <div className={`text-xs ${
                           isActive ? 'text-blue-100' : 'text-gray-400 dark:text-gray-500'
                         }`}>
-                          {formatDate(c.updatedAt)}
+                          {formatDate(c?.updatedAt || Date.now())}
                         </div>
                         {messageCount > 0 && (
                           <div className={`text-xs mt-1 px-2 py-0.5 rounded-full ${
