@@ -37,7 +37,8 @@ export const ChatWindow: React.FC = () => {
     messagesCount: messages.length, 
     messages,
     conversations: Object.keys(conversations),
-    currentConversation: conversations[currentId!]
+    currentConversation: conversations[currentId!],
+    loading
   })
 
   const onSend = async (text: string) => {
@@ -83,28 +84,39 @@ export const ChatWindow: React.FC = () => {
         onDone: () => { 
           console.log('ChatWindow: onDone called')
           endAssistant(); 
+          console.log('ChatWindow: setting loading to false in onDone')
           setLoading(false); 
           logger.info('assistant', 'สตรีมเสร็จสิ้น') 
         },
         onError: (e) => {
+          console.log('ChatWindow: onError called with error:', e)
           const msg = e instanceof Error ? e.message : 'สตรีมล้มเหลว'
           push({ type: 'error', msg })
           endAssistant()
+          console.log('ChatWindow: setting loading to false in onError')
           setLoading(false)
           logger.error('assistant', 'สตรีมผิดพลาด', { error: String(e) })
         },
         abortSignal: controller.signal
       })
     } catch (e) {
+      console.log('ChatWindow: catch block called with error:', e)
       const msg = e instanceof Error ? e.message : 'การส่งคำขอล้มเหลว'
       push({ type: 'error', msg })
       endAssistant()
+      console.log('ChatWindow: setting loading to false in catch')
       setLoading(false)
       logger.error('assistant', 'ส่งคำขอเริ่มสตรีมล้มเหลว', { error: String(e) })
     }
   }
 
-  const stop = () => { abortRef.current?.abort(); setLoading(false); logger.warn('assistant', 'ผู้ใช้หยุดสตรีม') }
+  const stop = () => { 
+    console.log('ChatWindow: stop called')
+    abortRef.current?.abort(); 
+    console.log('ChatWindow: setting loading to false in stop')
+    setLoading(false); 
+    logger.warn('assistant', 'ผู้ใช้หยุดสตรีม') 
+  }
 
   // Empty state when no conversation
   if (!currentId || messages.length === 0) {
