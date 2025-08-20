@@ -181,6 +181,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ],
     }
     const next = { ...conversations, [currentId]: nextConv }
+    // อัปเดต UI ทันที แล้วค่อยบันทึกแบบพื้นหลัง
+    setConversations(next)
     void save(next)
     logger.info('message', 'เพิ่มข้อความ', { conversationId: currentId, role: msg.role, tokens: (msg as any).tokens })
     logger.debug('assistant', 'เริ่ม assistant message', { id: assistId, conversationId: currentId })
