@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { SavedApiKey, SavedSystemInstruction } from '../types'
 
 type SavedItemManagerProps<T> = {
@@ -38,16 +38,16 @@ export function SavedItemManager<T extends SavedApiKey | SavedSystemInstruction>
     if (editingItem) {
       // อัปเดตรายการเดิม
       if (type === 'apiKey') {
-        onUpdate(editingItem.id, { name: saveName, key: saveValue } as Omit<T, 'id' | 'createdAt'>)
+        onUpdate(editingItem.id, { name: saveName, key: saveValue } as unknown as Omit<T, 'id' | 'createdAt'>)
       } else {
-        onUpdate(editingItem.id, { name: saveName, content: saveValue } as Omit<T, 'id' | 'createdAt'>)
+        onUpdate(editingItem.id, { name: saveName, content: saveValue } as unknown as Omit<T, 'id' | 'createdAt'>)
       }
     } else {
       // สร้างรายการใหม่
       if (type === 'apiKey') {
-        onSave({ name: saveName, key: saveValue } as Omit<T, 'id' | 'createdAt'>)
+        onSave({ name: saveName, key: saveValue } as unknown as Omit<T, 'id' | 'createdAt'>)
       } else {
-        onSave({ name: saveName, content: saveValue } as Omit<T, 'id' | 'createdAt'>)
+        onSave({ name: saveName, content: saveValue } as unknown as Omit<T, 'id' | 'createdAt'>)
       }
     }
 
@@ -117,7 +117,7 @@ export function SavedItemManager<T extends SavedApiKey | SavedSystemInstruction>
                       <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
                         {type === 'apiKey' 
                           ? `${(item as SavedApiKey).key.substring(0, 20)}...`
-                          : (item as SavedSystemInstruction).content.substring(0, 50) + (item.content.length > 50 ? '...' : '')
+                          : (item as SavedSystemInstruction).content.substring(0, 50) + ((item as SavedSystemInstruction).content.length > 50 ? '...' : '')
                         }
                       </div>
                     </button>
