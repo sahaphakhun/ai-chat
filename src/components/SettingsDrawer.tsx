@@ -139,15 +139,32 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">System Instruction</h3>
             </div>
             
-            <textarea
-              value={settings.systemPrompt}
-              onChange={e => setSettings(s => ({ ...s, systemPrompt: e.target.value }))}
-              placeholder="ข้อความ system ที่จะส่งให้ AI ทุกครั้ง เช่น บทบาท ลักษณะการตอบ หรือข้อจำกัดต่างๆ"
-              className="w-full h-32 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            />
-            
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              💡 ตัวอย่าง: "คุณเป็นผู้ช่วยที่เป็นมิตรและให้ข้อมูลที่ถูกต้อง ตอบเป็นภาษาไทยเสมอ"
+            <div className="space-y-3">
+              {/* Current System Prompt Input */}
+              <textarea
+                value={settings.systemPrompt}
+                onChange={e => setSettings(s => ({ ...s, systemPrompt: e.target.value }))}
+                placeholder="ข้อความ system ที่จะส่งให้ AI ทุกครั้ง เช่น บทบาท ลักษณะการตอบ หรือข้อจำกัดต่างๆ"
+                className="w-full h-32 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              />
+              
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                💡 ตัวอย่าง: "คุณเป็นผู้ช่วยที่เป็นมิตรและให้ข้อมูลที่ถูกต้อง ตอบเป็นภาษาไทยเสมอ"
+              </div>
+
+              {/* Saved System Instructions Manager */}
+              <SavedItemManager<SavedSystemInstruction>
+                items={settings.savedSystemInstructions}
+                currentValue={settings.systemPrompt}
+                onSelect={(content) => setSettings(s => ({ ...s, systemPrompt: content }))}
+                onSave={saveSystemInstruction}
+                onDelete={deleteSystemInstruction}
+                onUpdate={updateSystemInstruction}
+                type="systemInstruction"
+                placeholder="ข้อความ system ที่จะส่งให้ AI ทุกครั้ง เช่น บทบาท ลักษณะการตอบ หรือข้อจำกัดต่างๆ"
+                title="System Instruction"
+                icon="💬"
+              />
             </div>
           </div>
 
