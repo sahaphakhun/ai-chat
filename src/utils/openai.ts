@@ -36,6 +36,9 @@ export async function streamChat(opts: StreamOptions) {
   const body = {
     model,
     stream: true,
+    stream_options: {
+      include_usage: true
+    },
     messages: [
       ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
       ...messages.map(m => ({ role: m.role, content: m.content }))

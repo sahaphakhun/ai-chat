@@ -23,7 +23,12 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
       setShouldAutoScroll(isAtBottom)
     }
 
-    container.addEventListener('scroll', handleScroll)
+    // เพิ่ม passive: true เพื่อประสิทธิภาพที่ดีขึ้น
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    
+    // ตรวจสอบสถานะเริ่มต้น
+    handleScroll()
+    
     return () => container.removeEventListener('scroll', handleScroll)
   }, [])
 
@@ -66,10 +71,11 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
   return (
     <div 
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin"
+      className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin min-h-0"
       style={{ 
         scrollBehavior: 'smooth',
-        overscrollBehavior: 'contain'
+        overscrollBehavior: 'contain',
+        height: '100%'
       }}
     >
       {messages.map((m) => (

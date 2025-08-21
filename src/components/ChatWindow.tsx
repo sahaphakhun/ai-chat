@@ -133,7 +133,7 @@ export const ChatWindow: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col flex-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+    <div className="flex flex-col flex-1 min-h-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
       {/* Messages */}
       <MessageList messages={messages} />
 

@@ -43,7 +43,7 @@ export const SessionList: React.FC<{ className?: string; onSelect?: () => void }
   }
 
   return (
-    <div className={className ?? "w-80 shrink-0 overflow-y-auto h-full bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm"}>
+    <div className={className ?? "w-80 shrink-0 overflow-y-auto h-full bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm scrollbar-thin"}>
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
