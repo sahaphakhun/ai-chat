@@ -210,11 +210,21 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const conversation = state.conversations[conversationId]
       if (!conversation) return state
       
-      const updatedMessages = conversation.messages.map(msg =>
-        msg.id === messageId 
-          ? { ...msg, usage, tokens: usage.completion_tokens }
-          : msg
-      )
+      // หา user message ล่าสุด (ก่อน assistant message ที่กำลังอัปเดต)
+      const assistantIndex = conversation.messages.findIndex(msg => msg.id === messageId)
+      const lastUserMessageIndex = assistantIndex > 0 ? assistantIndex - 1 : -1
+      const lastUserMessage = lastUserMessageIndex >= 0 ? conversation.messages[lastUserMessageIndex] : null
+      
+      const updatedMessages = conversation.messages.map((msg, index) => {
+        if (msg.id === messageId) {
+          // อัปเดต assistant message ด้วย usage และ completion_tokens
+          return { ...msg, usage, tokens: usage.completion_tokens }
+        } else if (index === lastUserMessageIndex && lastUserMessage?.role === 'user') {
+          // อัปเดต user message ล่าสุดด้วย usage เดียวกัน
+          return { ...msg, usage, tokens: usage.prompt_tokens }
+        }
+        return msg
+      })
       
       const updatedConversation: Conversation = {
         ...conversation,

@@ -5,7 +5,7 @@ import { MessageInput } from './MessageInput'
 import { useSettings } from '../contexts/SettingsContext'
 import { streamChat } from '../utils/openai'
 import { useToast } from '../contexts/ToastContext'
-import { countTokensText, countTokensFromUsage } from '../utils/token'
+import { countTokensFromUsage } from '../utils/token'
 import { formatUSD, calculateCostFromUsage } from '../utils/cost'
 import { logger } from '../utils/logger'
 import type { Message } from '../types'
@@ -59,8 +59,8 @@ export const ChatWindow: React.FC = () => {
       actions.setLoading(true)
       actions.setError(null)
 
-      // เพิ่มข้อความผู้ใช้
-      actions.addUserMessage(text, countTokensText(text))
+      // เพิ่มข้อความผู้ใช้ (ไม่ส่ง tokens เพราะจะได้จาก OpenAI API response)
+      actions.addUserMessage(text, 0)
 
       // สร้างข้อความ assistant ว่าง
       const assistantMessageId = actions.startAssistantMessage()
