@@ -27,14 +27,15 @@ export const ChatWindow: React.FC = () => {
   const messages = currentConversation?.messages ?? []
   const apiStats = countTokensFromUsage(messages)
   
-  // คำนวณค่าใช้จ่ายจากข้อมูล API หรือแสดง 0 ถ้าไม่มี
+  // คำนวณค่าใช้จ่ายรวมตามที่ระบุ: usage["prompt_tokens"] * PRICE_INPUT + usage["cached_tokens"] * PRICE_CACHED + usage["completion_tokens"] * PRICE_OUTPUT
   const totalCost = useMemo(() => {
     if (!apiStats.hasCompleteAPIData) return 0
     
     let cost = 0
     for (const message of messages) {
-      if (message.role === 'assistant' && message.usage) {
+      if (message.usage) {
         const messageCost = calculateCostFromUsage(message.usage, settings.model)
+        // รวมทุกส่วน: input + cached + output
         cost += messageCost.totalCost
       }
     }
