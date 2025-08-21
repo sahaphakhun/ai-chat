@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
-import { costUSD, formatUSD } from '../utils/cost'
+import { costUSD, formatUSD, calculateCostFromUsage } from '../utils/cost'
 import type { Message } from '../types'
 
 export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => {
@@ -61,11 +61,39 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
   }, [messages.length, shouldAutoScroll])
 
   const getMessageCost = (message: Message) => {
-    if (!message.tokens) return null
-    const cost = message.role === 'user' 
-      ? costUSD(message.tokens, settings.inPricePerK)
-      : costUSD(message.tokens, settings.outPricePerK)
-    return cost
+    // ใช้ข้อมูลจาก OpenAI API โดยตรงสำหรับทั้ง user และ assistant messages
+    // ข้อมูล usage มาจาก response ของ OpenAI API ที่ส่งมาพร้อมกับ streaming response
+    if (message.usage) {
+      const costData = calculateCostFromUsage(message.usage, settings.model)
+      return {
+        totalCost: costData.totalCost,
+        breakdown: costData.breakdown,
+        tokens: {
+          input: message.usage.prompt_tokens,
+          output: message.usage.completion_tokens,
+          total: message.usage.total_tokens,
+          cached: message.usage.prompt_tokens_details?.cached_tokens ?? 0
+        }
+      }
+    }
+    
+    // Fallback: ใช้การคำนวณเองเฉพาะกรณีที่ไม่มีข้อมูล usage จาก OpenAI API
+    // (ควรจะไม่เกิดขึ้นในการใช้งานปกติ)
+    if (message.tokens) {
+      const cost = costUSD(message.tokens, message.role === 'user' ? settings.inPricePerK : settings.outPricePerK)
+      return {
+        totalCost: cost,
+        breakdown: null,
+        tokens: {
+          input: message.role === 'user' ? message.tokens : 0,
+          output: message.role === 'assistant' ? message.tokens : 0,
+          total: message.tokens,
+          cached: 0
+        }
+      }
+    }
+    
+    return null
   }
 
   return (
@@ -105,16 +133,39 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
                 <div className={`mt-1 text-xs text-gray-500 dark:text-gray-400 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
                   <div className="flex items-center justify-between">
                     <span>{m.role === 'user' ? 'คุณ' : 'AI Assistant'}</span>
-                    {m.tokens && (
-                      <div className="flex items-center space-x-2">
-                        <span>• {m.tokens} tokens</span>
-                        {getMessageCost(m) && (
+                    {(() => {
+                      const costInfo = getMessageCost(m)
+                      if (!costInfo) return null
+                      
+                      return (
+                        <div className="flex items-center space-x-2">
+                          {/* แสดงโทเค็นจาก OpenAI API สำหรับทั้ง user และ assistant */}
+                          {m.usage ? (
+                            <span>
+                              • {costInfo.tokens.total} tokens 
+                              ({costInfo.tokens.input} in, {costInfo.tokens.output} out
+                              {costInfo.tokens.cached > 0 && `, ${costInfo.tokens.cached} cached`})
+                            </span>
+                          ) : (
+                            <span>• {costInfo.tokens.total} tokens (คำนวณโดยประมาณ)</span>
+                          )}
+                          
+                          {/* แสดงราคา */}
                           <span className="text-green-600 dark:text-green-400 font-medium">
-                            • {formatUSD(getMessageCost(m)!)}
+                            • {formatUSD(costInfo.totalCost)}
                           </span>
-                        )}
-                      </div>
-                    )}
+                          
+                          {/* แสดงรายละเอียดราคาสำหรับข้อความที่มี breakdown */}
+                          {costInfo.breakdown && (
+                            <span className="text-xs text-gray-400">
+                              (in: {formatUSD(costInfo.breakdown.regularInputCost)}
+                              {costInfo.breakdown.cachedInputCost > 0 && ` + cached: ${formatUSD(costInfo.breakdown.cachedInputCost)}`}
+                              , out: {formatUSD(costInfo.breakdown.outputCost)})
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>

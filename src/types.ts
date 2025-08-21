@@ -36,6 +36,20 @@ export type Conversation = {
   model: ModelName
 }
 
+export type SavedApiKey = {
+  id: string
+  name: string
+  key: string
+  createdAt: number
+}
+
+export type SavedSystemInstruction = {
+  id: string
+  name: string
+  content: string
+  createdAt: number
+}
+
 export type Settings = {
   apiKey: string
   systemPrompt: string
@@ -43,4 +57,7 @@ export type Settings = {
   inPricePerK: number
   outPricePerK: number
   theme: 'light' | 'dark'
+  // เพิ่มรายการที่บันทึกไว้
+  savedApiKeys: SavedApiKey[]
+  savedSystemInstructions: SavedSystemInstruction[]
 }

@@ -2,12 +2,23 @@ import React, { useState } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
 import { ModelSelect } from './ModelSelect'
 import { TokenCostPanel } from './TokenCostPanel'
+import { SavedItemManager } from './SavedItemManager'
 import { useToast } from '../contexts/ToastContext'
 import { listModels } from '../utils/openai'
 import { logger } from '../utils/logger'
+import type { SavedApiKey, SavedSystemInstruction } from '../types'
 
 export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
-  const { settings, setSettings } = useSettings()
+  const { 
+    settings, 
+    setSettings,
+    saveApiKey,
+    updateApiKey,
+    deleteApiKey,
+    saveSystemInstruction,
+    updateSystemInstruction,
+    deleteSystemInstruction
+  } = useSettings()
   const { push } = useToast()
   const [showKey, setShowKey] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -68,6 +79,7 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
             </div>
             
             <div className="space-y-3">
+              {/* Current API Key Input */}
               <div className="flex items-center space-x-2">
                 <div className="flex-1 relative">
                   <input
@@ -103,6 +115,20 @@ export const SettingsDrawer: React.FC<{ open: boolean; onClose: () => void }> = 
                   )}
                 </button>
               </div>
+
+              {/* Saved API Keys Manager */}
+              <SavedItemManager<SavedApiKey>
+                items={settings.savedApiKeys}
+                currentValue={settings.apiKey}
+                onSelect={(key) => setSettings(s => ({ ...s, apiKey: key }))}
+                onSave={saveApiKey}
+                onDelete={deleteApiKey}
+                onUpdate={updateApiKey}
+                type="apiKey"
+                placeholder="sk-..."
+                title="API Key"
+                icon="🔑"
+              />
             </div>
           </div>
 
