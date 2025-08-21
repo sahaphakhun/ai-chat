@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useMemo } from 'react'
 import { useChat } from '../contexts/ChatContext'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { useSettings } from '../contexts/SettingsContext'
 import { streamChat } from '../utils/openai'
 import { useToast } from '../contexts/ToastContext'
-import { countTokensText, countTokensConversation } from '../utils/token'
-import { costUSD, formatUSD } from '../utils/cost'
+import { countTokensText, countTokensFromUsage } from '../utils/token'
+import { formatUSD, calculateCostFromUsage } from '../utils/cost'
 import { logger } from '../utils/logger'
 import type { Message } from '../types'
 
@@ -25,9 +25,21 @@ export const ChatWindow: React.FC = () => {
 
   const currentConversation = state.currentId ? state.conversations[state.currentId] : null
   const messages = currentConversation?.messages ?? []
-  const stats = countTokensConversation(messages)
-  const inCost = costUSD(stats.input, settings.inPricePerK)
-  const outCost = costUSD(stats.output, settings.outPricePerK)
+  const apiStats = countTokensFromUsage(messages)
+  
+  // คำนวณค่าใช้จ่ายจากข้อมูล API หรือแสดง 0 ถ้าไม่มี
+  const totalCost = useMemo(() => {
+    if (!apiStats.hasCompleteAPIData) return 0
+    
+    let cost = 0
+    for (const message of messages) {
+      if (message.role === 'assistant' && message.usage) {
+        const messageCost = calculateCostFromUsage(message.usage, settings.model)
+        cost += messageCost.totalCost
+      }
+    }
+    return cost
+  }, [messages, apiStats.hasCompleteAPIData, settings.model])
 
   const handleSendMessage = async (text: string) => {
     if (!state.currentId) {
@@ -175,12 +187,19 @@ export const ChatWindow: React.FC = () => {
           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center space-x-4 text-gray-500 dark:text-gray-400">
-                <span>💰 Total: {(stats.input + stats.output).toLocaleString()}</span>
-                <span>📊 Input: {stats.input.toLocaleString()}</span>
-                <span>📤 Output: {stats.output.toLocaleString()}</span>
+                <span>💰 Total: {(apiStats.input + apiStats.output).toLocaleString()}</span>
+                <span>📊 Input: {apiStats.input.toLocaleString()}</span>
+                <span>📤 Output: {apiStats.output.toLocaleString()}</span>
+                {apiStats.hasCompleteAPIData && (
+                  <span className="text-green-600 dark:text-green-400 text-xs">✓ API</span>
+                )}
+                {!apiStats.hasCompleteAPIData && (
+                  <span className="text-gray-500 dark:text-gray-400 text-xs">รอข้อมูล API</span>
+                )}
               </div>
               <div className="font-medium text-gray-700 dark:text-gray-300">
-                ค่าใช้จ่าย: <span className="text-green-600 dark:text-green-400">{formatUSD(inCost + outCost)}</span>
+                ค่าใช้จ่าย: <span className="text-green-600 dark:text-green-400">{formatUSD(totalCost)}</span>
+                <span className="ml-2 text-blue-600 dark:text-blue-400">(≈{(totalCost * 32.6).toFixed(2)}฿)</span>
               </div>
             </div>
           </div>
