@@ -65,8 +65,19 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
     // ข้อมูล usage มาจาก response ของ OpenAI API ที่ส่งมาพร้อมกับ streaming response
     if (message.usage) {
       const costData = calculateCostFromUsage(message.usage, settings.model)
+      
+      // คำนวณต้นทุนตาม role ของข้อความ
+      let displayCost = 0
+      if (message.role === 'user') {
+        // สำหรับ User messages: prompt_tokens*PRICE_INPUT + cached_tokens*PRICE_CACHED
+        displayCost = costData.breakdown.regularInputCost + costData.breakdown.cachedInputCost
+      } else if (message.role === 'assistant') {
+        // สำหรับ Assistant messages: completion_tokens*PRICE_OUTPUT
+        displayCost = costData.breakdown.outputCost
+      }
+      
       return {
-        totalCost: costData.totalCost,
+        totalCost: displayCost,
         breakdown: costData.breakdown,
         tokens: {
           input: message.usage.prompt_tokens,
@@ -139,12 +150,17 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
                       
                       return (
                         <div className="flex items-center space-x-2">
-                          {/* แสดงโทเค็นจาก OpenAI API สำหรับทั้ง user และ assistant */}
+                          {/* แสดงโทเค็นตาม role ของข้อความ */}
                           {m.usage ? (
                             <span>
-                              • {costInfo.tokens.total} tokens 
-                              ({costInfo.tokens.input} in, {costInfo.tokens.output} out
-                              {costInfo.tokens.cached > 0 && `, ${costInfo.tokens.cached} cached`})
+                              {m.role === 'user' ? (
+                                <>
+                                  • {costInfo.tokens.input} input tokens
+                                  {costInfo.tokens.cached > 0 && ` (${costInfo.tokens.cached} cached)`}
+                                </>
+                              ) : (
+                                <>• {costInfo.tokens.output} output tokens</>
+                              )}
                             </span>
                           ) : (
                             <span>• {costInfo.tokens.total} tokens (คำนวณโดยประมาณ)</span>
@@ -155,12 +171,17 @@ export const MessageList: React.FC<{ messages: Message[] }> = ({ messages }) => 
                             • {formatUSD(costInfo.totalCost)}
                           </span>
                           
-                          {/* แสดงรายละเอียดราคาสำหรับข้อความที่มี breakdown */}
-                          {costInfo.breakdown && (
+                          {/* แสดงรายละเอียดราคาตาม role */}
+                          {costInfo.breakdown && m.usage && (
                             <span className="text-xs text-gray-400">
-                              (in: {formatUSD(costInfo.breakdown.regularInputCost)}
-                              {costInfo.breakdown.cachedInputCost > 0 && ` + cached: ${formatUSD(costInfo.breakdown.cachedInputCost)}`}
-                              , out: {formatUSD(costInfo.breakdown.outputCost)})
+                              {m.role === 'user' ? (
+                                <>
+                                  (input: {formatUSD(costInfo.breakdown.regularInputCost)}
+                                  {costInfo.breakdown.cachedInputCost > 0 && ` + cached: ${formatUSD(costInfo.breakdown.cachedInputCost)}`})
+                                </>
+                              ) : (
+                                <>(output: {formatUSD(costInfo.breakdown.outputCost)})</>
+                              )}
                             </span>
                           )}
                         </div>
